@@ -5,6 +5,8 @@
 
 #include "../include/Process.hpp"
 
+constexpr size_t PAGE_SIZE = 4096;
+
 namespace WindowsInfo {
     Process::Process(std::string name, unsigned long id, unsigned long parentId, unsigned int threadCount, unsigned int priorityBase) :
     name(name),
@@ -13,6 +15,12 @@ namespace WindowsInfo {
     threadCount(threadCount),
     priorityBase(priorityBase),
     priorityClass(0),
+    memoryCommitted(0),
+    memoryReserved(0),
+    memoryHeap(0),
+    memoryStack(0),
+    memoryCode(0),
+    numberOfPages(0),
     threads() {
         HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
         if( hProcess == NULL )
@@ -23,6 +31,49 @@ namespace WindowsInfo {
             if( !priorityClass )
                 std::cerr << "GetPriorityClass failed: " << GetLastError() << std::endl;
                 // printError( TEXT("GetPriorityClass") );
+
+            //https://stackoverflow.com/questions/2686096/c-get-username-from-process
+            // Pega o nome do usuario que iniciou o processo
+            HANDLE hToken = nullptr;
+            if (!OpenProcessToken(hProcess, TOKEN_QUERY, &hToken)) {
+                CloseHandle(hProcess);
+                return;
+            }
+
+            DWORD tokenInfoLength = 0;
+            GetTokenInformation(hToken, TokenUser, nullptr, 0, &tokenInfoLength);
+            if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+                CloseHandle(hToken);
+                CloseHandle(hProcess);
+                return;
+            }
+
+            BYTE* tokenInfo = new BYTE[tokenInfoLength];
+            if (!GetTokenInformation(hToken, TokenUser, tokenInfo, tokenInfoLength, &tokenInfoLength)) {
+                delete[] tokenInfo;
+                CloseHandle(hToken);
+                CloseHandle(hProcess);
+                return;
+            }
+
+            TOKEN_USER* tokenUser = reinterpret_cast<TOKEN_USER*>(tokenInfo);
+            WCHAR name[256], domain[256];
+            DWORD nameLen = 256, domainLen = 256;
+            SID_NAME_USE sidType;
+
+            if (LookupAccountSidW(nullptr, tokenUser->User.Sid, name, &nameLen, domain, &domainLen, &sidType)) {
+                std::wstring wuser = std::wstring(domain) + L"\\" + name;
+                userName = std::string(wuser.begin(), wuser.end()); 
+
+            } else {
+                delete[] tokenInfo;
+                CloseHandle(hToken);
+                CloseHandle(hProcess);
+                return;
+            }
+
+            delete[] tokenInfo;
+            CloseHandle(hToken);
             CloseHandle( hProcess );
         }
     }
@@ -76,5 +127,53 @@ namespace WindowsInfo {
     }
     unsigned int Process::getThreadCount() {
         return threadCount;
+    }
+    std::string Process::getUserName() {
+        return userName;
+    }
+    void Process::loadMemoryInfo() {
+        // N achei info, aqui foi chat na veia -> pesquisar na doc dps
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, id);
+        if (!hProcess) {
+            std::cerr << "OpenProcess failed in loadMemoryInfo: " << GetLastError() << std::endl;
+            return;
+        }
+
+        MEMORY_BASIC_INFORMATION mbi;
+        uintptr_t addr = 0;
+
+        unsigned long long totalCommitted = 0, totalReserved = 0, totalFree = 0;
+        unsigned long long heapSize = 0, stackSize = 0, codeSize = 0;
+        unsigned long long pageReadable = 0, pageWritable = 0, pageExecutable = 0;
+        numberOfPages = 0;
+        while (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(addr), &mbi, sizeof(mbi)) == sizeof(mbi)) {
+            if (mbi.State == MEM_COMMIT) {
+                totalCommitted += static_cast<unsigned long long>(mbi.RegionSize);
+
+                DWORD protect = mbi.Protect;
+
+                // Heurísticas para heap, stack e código
+                if (protect == PAGE_READWRITE && mbi.Type == MEM_PRIVATE)
+                    heapSize += static_cast<unsigned long long>(mbi.RegionSize);
+                if ((protect & PAGE_EXECUTE) || (protect & PAGE_EXECUTE_READ) || (protect & PAGE_EXECUTE_READWRITE))
+                    codeSize += static_cast<unsigned long long>(mbi.RegionSize);
+                if (protect == PAGE_READWRITE && mbi.AllocationBase == mbi.BaseAddress)
+                    stackSize += static_cast<unsigned long long>(mbi.RegionSize);
+
+                numberOfPages += mbi.RegionSize / PAGE_SIZE;
+                
+            } else if (mbi.State == MEM_RESERVE) {
+                totalReserved += static_cast<unsigned long long>(mbi.RegionSize);
+            }
+            addr += mbi.RegionSize;
+        }
+
+        CloseHandle(hProcess);
+
+        this->memoryCommitted = totalCommitted / 1024;
+        this->memoryReserved = totalReserved / 1024;
+        this->memoryHeap = heapSize / 1024;
+        this->memoryStack = stackSize / 1024;
+        this->memoryCode = codeSize / 1024;
     }
 }
