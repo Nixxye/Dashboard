@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <vector>
 namespace WindowsInfo {
     class System {
     public:

@@ -29,7 +29,7 @@ void printError( TCHAR const* msg )
                           ( ( *p == '.' ) || ( *p < 33 ) ) );
 
   // Display the message
-  _tprintf( TEXT("\n  WARNING: %s failed with error %d (%s)"), msg, eNum, sysMsg );
+  printf( (char*)TEXT("\n  WARNING: %s failed with error %d (%s)"), msg, eNum, sysMsg );
 }
 
 int main(void) {
