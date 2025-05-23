@@ -12,7 +12,7 @@
 #include <winnt.h>
 #include <winscard.h>
 
-#define clockInterval 5000 // 5s
+#define clockInterval 1000 // 5s
 
 // Mock process list
 struct MockProcess {
