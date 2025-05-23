@@ -7,7 +7,7 @@ namespace WindowsInfo {
         ~System();
 
         std::vector<double> calculatePerCpuUsage();
-        double calculateCpuUsage();
+        double getCpuUsage();
         double calculateIdleTime();
         double calculateMemoryUsage();
         double calculateDiskUsage();

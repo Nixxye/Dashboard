@@ -46,9 +46,9 @@ BOOL GetProcessList( )
   // display information about each process in turn
   do
   {
-    _tprintf( TEXT("\n\n=====================================================" ));
-    _tprintf( TEXT("\nPROCESS NAME:  %s"), pe32.szExeFile );
-    _tprintf( TEXT("\n-------------------------------------------------------" ));
+    // _tprintf( TEXT("\n\n=====================================================" ));
+    // _tprintf( TEXT("\nPROCESS NAME:  %s"), pe32.szExeFile );
+    // _tprintf( TEXT("\n-------------------------------------------------------" ));
 
     // Retrieve the priority class.
     dwPriorityClass = 0;
@@ -63,12 +63,12 @@ BOOL GetProcessList( )
       CloseHandle( hProcess );
     }
 
-    _tprintf( TEXT("\n  Process ID        = 0x%08X"), pe32.th32ProcessID );
-    _tprintf( TEXT("\n  Thread count      = %d"),   pe32.cntThreads );
-    _tprintf( TEXT("\n  Parent process ID = 0x%08X"), pe32.th32ParentProcessID );
-    _tprintf( TEXT("\n  Priority base     = %d"), pe32.pcPriClassBase );
+    // _tprintf( TEXT("\n  Process ID        = 0x%08X"), pe32.th32ProcessID );
+    // _tprintf( TEXT("\n  Thread count      = %d"),   pe32.cntThreads );
+    // _tprintf( TEXT("\n  Parent process ID = 0x%08X"), pe32.th32ParentProcessID );
+    // _tprintf( TEXT("\n  Priority base     = %d"), pe32.pcPriClassBase );
     if( dwPriorityClass )
-      _tprintf( TEXT("\n  Priority class    = %d"), dwPriorityClass );
+      // _tprintf( TEXT("\n  Priority class    = %d"), dwPriorityClass );
 
     // List the modules and threads associated with this process
     ListProcessModules( pe32.th32ProcessID );
@@ -110,13 +110,13 @@ BOOL ListProcessModules( DWORD dwPID )
   // and display information about each module
   do
   {
-    _tprintf( TEXT("\n\n     MODULE NAME:     %s"),   me32.szModule );
-    _tprintf( TEXT("\n     Executable     = %s"),     me32.szExePath );
-    _tprintf( TEXT("\n     Process ID     = 0x%08X"),         me32.th32ProcessID );
-    _tprintf( TEXT("\n     Ref count (g)  = 0x%04X"),     me32.GlblcntUsage );
-    _tprintf( TEXT("\n     Ref count (p)  = 0x%04X"),     me32.ProccntUsage );
-    _tprintf( TEXT("\n     Base address   = 0x%08X"), (DWORD) me32.modBaseAddr );
-    _tprintf( TEXT("\n     Base size      = %d"),             me32.modBaseSize );
+    // _tprintf( TEXT("\n\n     MODULE NAME:     %s"),   me32.szModule );
+    // _tprintf( TEXT("\n     Executable     = %s"),     me32.szExePath );
+    // _tprintf( TEXT("\n     Process ID     = 0x%08X"),         me32.th32ProcessID );
+    // _tprintf( TEXT("\n     Ref count (g)  = 0x%04X"),     me32.GlblcntUsage );
+    // _tprintf( TEXT("\n     Ref count (p)  = 0x%04X"),     me32.ProccntUsage );
+    // _tprintf( TEXT("\n     Base address   = 0x%08X"), (DWORD) me32.modBaseAddr );
+    // _tprintf( TEXT("\n     Base size      = %d"),             me32.modBaseSize );
 
   } while( Module32Next( hModuleSnap, &me32 ) );
 
@@ -153,10 +153,10 @@ BOOL ListProcessThreads( DWORD dwOwnerPID )
   { 
     if( te32.th32OwnerProcessID == dwOwnerPID )
     {
-      _tprintf( TEXT("\n\n     THREAD ID      = 0x%08X"), te32.th32ThreadID ); 
-      _tprintf( TEXT("\n     Base priority  = %d"), te32.tpBasePri ); 
-      _tprintf( TEXT("\n     Delta priority = %d"), te32.tpDeltaPri ); 
-      _tprintf( TEXT("\n"));
+      // _tprintf( TEXT("\n\n     THREAD ID      = 0x%08X"), te32.th32ThreadID ); 
+      // _tprintf( TEXT("\n     Base priority  = %d"), te32.tpBasePri ); 
+      // _tprintf( TEXT("\n     Delta priority = %d"), te32.tpDeltaPri ); 
+      // _tprintf( TEXT("\n"));
     }
   } while( Thread32Next(hThreadSnap, &te32 ) ); 
 
@@ -166,23 +166,23 @@ BOOL ListProcessThreads( DWORD dwOwnerPID )
 
 void printError( TCHAR const* msg )
 {
-  DWORD eNum;
-  TCHAR sysMsg[256];
-  TCHAR* p;
+  // DWORD eNum;
+  // TCHAR sysMsg[256];
+  // TCHAR* p;
 
-  eNum = GetLastError( );
-  FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-         NULL, eNum,
-         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-         sysMsg, 256, NULL );
+  // eNum = GetLastError( );
+  // FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+  //        NULL, eNum,
+  //        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+  //        sysMsg, 256, NULL );
 
-  // Trim the end of the line and terminate it with a null
-  p = sysMsg;
-  while( ( *p > 31 ) || ( *p == 9 ) )
-    ++p;
-  do { *p-- = 0; } while( ( p >= sysMsg ) &&
-                          ( ( *p == '.' ) || ( *p < 33 ) ) );
+  // // Trim the end of the line and terminate it with a null
+  // p = sysMsg;
+  // while( ( *p > 31 ) || ( *p == 9 ) )
+  //   ++p;
+  // do { *p-- = 0; } while( ( p >= sysMsg ) &&
+  //                         ( ( *p == '.' ) || ( *p < 33 ) ) );
 
   // Display the message
-  _tprintf( TEXT("\n  WARNING: %s failed with error %d (%s)"), msg, eNum, sysMsg );
+  // _tprintf( TEXT("\n  WARNING: %s failed with error %d (%s)"), msg, eNum, sysMsg );
 }

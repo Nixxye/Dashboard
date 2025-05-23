@@ -98,17 +98,14 @@ namespace WindowsInfo {
         delete[] data;
         FreeLibrary(hNtDll);
 
+        double sum = 0.0;
+        for (double u : usages) sum += u;
+        cpuUsage = sum / usages.size();
 
         return usages;
     }
 
-    double System::calculateCpuUsage() {
-        std::vector<double> usages = calculatePerCpuUsage();
-        if (usages.empty()) return 0.0;
-
-        double sum = 0.0;
-        for (double u : usages) sum += u;
-        cpuUsage = sum / usages.size();
+    double System::getCpuUsage() {
         return cpuUsage;
     }
 
@@ -126,7 +123,7 @@ namespace WindowsInfo {
             return (usedMemory * 100.0) / memStatus.ullTotalPhys;
         } else {
             // Se falhar, retorna 0
-            std::cerr << "GlobalMemoryStatusEx failed: " << GetLastError() << std::endl;
+            // std::cerr << "GlobalMemoryStatusEx failed: " << GetLastError() << std::endl;
             return 0.0;
         }
     }

@@ -135,7 +135,7 @@ namespace WindowsInfo {
         // N achei info, aqui foi chat na veia -> pesquisar na doc dps
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, id);
         if (!hProcess) {
-            std::cerr << "OpenProcess failed in loadMemoryInfo: " << GetLastError() << std::endl;
+            //std::cerr << "OpenProcess failed in loadMemoryInfo: " << GetLastError() << std::endl;
             return;
         }
 

@@ -1,119 +1,193 @@
-#include "Front/imgui/imgui.h"
-#include "Front/imgui/backends/imgui_impl_glfw.h"
-#include "Front/imgui/backends/imgui_impl_opengl3.h"
+#include "Model/include/Model.hpp"
+#include "View/imgui/backends/imgui_impl_glfw.h"
+#include "View/imgui/backends/imgui_impl_opengl3.h"
+#include "View/imgui/imgui.h"
+#include <Thread>
 
 #include <GLFW/glfw3.h>
+#include <chrono>
 #include <stdio.h>
 #include <string>
+#include <vector>
+#include <winnt.h>
+#include <winscard.h>
+
+#define clockInterval 5000 // 5s
+
+// Mock process list
+struct MockProcess {
+  std::string name;
+  unsigned long pid;
+  unsigned long threadCount;
+  unsigned long priorityBase;
+  unsigned long priorityClass;
+  unsigned long memoryCommitted;
+  unsigned long memoryReserved;
+  unsigned long numberOfPages;
+};
+
+std::vector<MockProcess> processes[2];
+std::vector<std::vector<double>> cpu_usage[2];
+std::vector<float> cpu_total_usage[2];
+short bufferSelector = 0;
+bool running = true;
+
+void swapViewBuffer() {
+  bufferSelector++;
+  bufferSelector %= 2;
+}
 
 void show_gui() {
 
-    ImGui::Begin("Process Monitor");
+  ImGui::Begin("Process Monitor");
 
-    ImGui::Text("Running Processes:");
-    ImGui::BeginChild("ProcessList", ImVec2(400, 300), true);
+  ImGui::Text("Running Processes:");
+  ImGui::BeginChild("ProcessList", ImVec2(400, 300), true);
 
-    // Mock process list
-    struct MockProcess {
-        const char* name;
-        int pid;
-        float cpu;
-        float mem;
-    };
-
-    static MockProcess processes[] = {
-        { "chrome.exe", 1234, 0.12f, 0.34f },
-        { "explorer.exe", 5678, 0.05f, 0.20f },
-        { "code.exe", 9012, 0.25f, 0.45f },
-        { "discord.exe", 3456, 0.07f, 0.30f },
-        { "steam.exe", 7890, 0.15f, 0.50f },
-    };
-
-    for (auto& proc : processes) {
-        std::string label = std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
-        if (ImGui::TreeNode(label.c_str())) {
-            ImGui::Text("-> Process Name: %s", proc.name);
-            ImGui::Text("-> PID: %d", proc.pid);
-            ImGui::Text("-> CPU Usage: %.2f%%", proc.cpu * 100);
-            ImGui::Text("-> Memory Usage: %.2f%%", proc.mem * 100);
-            ImGui::TreePop();
-        }
+  for (auto &proc : processes[bufferSelector]) {
+    std::string label =
+        std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
+    if (ImGui::TreeNode(label.c_str())) {
+      ImGui::Text("-> Process Name: %s", proc.name.c_str());
+      ImGui::Text("-> PID: %lu", proc.pid);
+      ImGui::Text("-> Memory Commited: %luKB", proc.memoryCommitted);
+      ImGui::Text("-> Memory Reserved: %luKB", proc.memoryReserved);
+      ImGui::Text("-> Number of Pages: %lu", proc.numberOfPages);
+      ImGui::Text("-> Priority Base: %lu", proc.priorityBase);
+      ImGui::Text("-> Priority Class: %lu", proc.priorityClass);
+      ImGui::Text("-> Number of Threads: %lu", proc.threadCount);
+      ImGui::TreePop();
     }
+  }
 
-    ImGui::EndChild();
-    ImGui::Separator();
+  ImGui::EndChild();
+  ImGui::Separator();
 
-    // CPU Usage Grid
-    const int cpu_count = 12;               // mock 8 logical CPUs
-    const int columns = 4;                 // grid layout: 4 columns
-    const int graph_size = 50;             // history length
-    static float cpu_usage[cpu_count][graph_size] = {};
+  // CPU Usage Grid
+  const int cpu_count = 12;  // mock 8 logical CPUs
+  const int columns = 4;     // grid layout: 4 columns
+  const int graph_size = 50; // history length
 
-    ImGui::Text("Per-Core CPU Usage:");
-    ImGui::Columns(columns, "cpu_columns", false);
-    for (int i = 0; i < cpu_count; ++i) {
-        // Scroll data
-        memmove(cpu_usage[i], cpu_usage[i] + 1, sizeof(float) * (graph_size - 1));
-        cpu_usage[i][graph_size - 1] = (rand() % 100) / 100.0f;  // mock value
+  ImGui::Text("Per-Core CPU Usage:");
+  ImGui::Columns(columns, "cpu_columns", false);
 
-        std::string label = "CPU " + std::to_string(i);
-        ImGui::Text("%s", label.c_str());
-        ImGui::PlotLines(("##" + label).c_str(), cpu_usage[i], graph_size, 0, nullptr, 0.0f, 1.0f, ImVec2(-1, 60));
-        ImGui::NextColumn();
+  for (int i = 0; i < cpu_count; ++i) {
+    std::vector<float> temp;
+    for (auto &element : cpu_usage[bufferSelector][i]) {
+      temp.push_back(element / 100);
     }
-    ImGui::Columns(1); // reset
+    std::string label = "CPU " + std::to_string(i);
+    ImGui::Text("%s", label.c_str());
+    ImGui::PlotLines(("##" + label).c_str(), temp.data(),
+                     cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
+                     1.0f, ImVec2(-1, 60));
+    ImGui::NextColumn();
+  }
+  ImGui::Columns(1); // reset
 
-    ImGui::Separator();
+  ImGui::Separator();
 
-    ImGui::Text("Total Memory Usage:");
-    static float mem[50] = {};
-    memmove(mem, mem + 1, sizeof(mem) - sizeof(float));
-    mem[49] = (rand() % 100) / 100.0f;
-    ImGui::PlotLines("##MEM", mem, 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
+  ImGui::Text("Total Memory Usage:");
+  static float mem[50] = {};
+  memmove(mem, mem + 1, sizeof(mem) - sizeof(float));
+  mem[49] = (rand() % 100) / 100.0f;
+  ImGui::PlotLines("##MEM", mem, 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
 
-    ImGui::End();
+  ImGui::End();
+}
+using namespace std::chrono_literals;
+void teste() {
+  WindowsInfo::Model model;
+  while (running) {
+    std::list<WindowsInfo::Process> procList = model.getProcesses();
+    WindowsInfo::System systemInfo = model.getSystemInfo();
+    int i = 0;
+    std::vector<MockProcess> vet;
+    vet.clear();
+    // vet.clear();
+    for (WindowsInfo::Process p : procList) {
+      MockProcess temp;
+      temp.pid = p.id;
+      temp.name = p.name;
+      temp.threadCount = p.getThreadCount();
+      temp.priorityBase = p.getPriorityBase();
+      temp.priorityClass = p.getPriorityClass();
+      temp.memoryCommitted = p.getMemoryCommitted();
+      temp.memoryReserved = p.getMemoryReserved();
+      temp.numberOfPages = p.getNumberOfPages();
+      vet.push_back(temp);
+      i++;
+    }
+    int current_index = (bufferSelector + 1) % 2;
+    processes[current_index] = vet;
+    std::vector<double> temp = systemInfo.calculatePerCpuUsage();
+    for (int i = 0; i < systemInfo.cpuCount; i++) {
+      cpu_usage[current_index][i].push_back((float)temp[i]);
+      if (cpu_usage[current_index][i].size() > 50)
+        cpu_usage[current_index][i].erase(cpu_usage[current_index][i].begin());
+    }
+    cpu_total_usage[current_index].push_back((float)systemInfo.getCpuUsage());
+    if (cpu_total_usage[current_index].size() > 50)
+      cpu_total_usage[current_index].erase(
+          cpu_total_usage[current_index].begin());
+
+    swapViewBuffer();
+    std::this_thread::sleep_for(std::chrono::milliseconds(clockInterval));
+  }
 }
 
-
-
 int main() {
-    if (!glfwInit()) return -1;
+  if (!glfwInit()) {
+    running = false;
+    return -1;
+  }
 
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "ImGui Example", NULL, NULL);
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
+  WindowsInfo::Model model;
+  auto tcpuCount = model.getSystemInfo().cpuCount;
+  for (int i = 0; i < tcpuCount; i++) {
+    std::vector<double> temp(50, 0.f);
+    cpu_usage[0].push_back(temp); // vai por cópia?
+    cpu_usage[1].push_back(temp);
+  }
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 130");
+  GLFWwindow *window = glfwCreateWindow(1280, 720, "Dashboard", NULL, NULL);
+  glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);
 
-    ImGui::StyleColorsDark();
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init("#version 130");
 
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+  ImGui::StyleColorsDark();
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+  std::thread t(teste);
 
-        show_gui();
+  while (!glfwWindowShouldClose(window)) {
+    glfwPollEvents();
 
-        ImGui::Render();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 
-        glfwSwapBuffers(window);
-    }
+    show_gui();
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    return 0;
+    ImGui::Render();
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+    glViewport(0, 0, display_w, display_h);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    glfwSwapBuffers(window);
+  }
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+  glfwDestroyWindow(window);
+  glfwTerminate();
+  running = false;
+  return 0;
 }
