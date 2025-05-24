@@ -21,6 +21,7 @@ namespace WindowsInfo {
         unsigned long long numberOfPages;
 
         void loadMemoryInfo();
+        void updateInfo();
     public:
         Process(std::string name, unsigned long id, unsigned long parentId, unsigned int threadCount, unsigned int priorityBase);
         ~Process();

@@ -43,6 +43,7 @@ int Model::getThreadCount() {
   }
   return threadCount;
 }
+// https://learn.microsoft.com/pt-br/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes
 void Model::updateProcesses() {
   processes.clear();
 
@@ -51,26 +52,24 @@ void Model::updateProcesses() {
   PROCESSENTRY32 pe32;
   DWORD dwPriorityClass;
 
-  // Take a snapshot of all processes in the system.
+  // Captura todos os processos em execução
   hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (hProcessSnap == INVALID_HANDLE_VALUE) {
     printError(TEXT("CreateToolhelp32Snapshot (of processes)"));
     return;
   }
 
-  // Set the size of the structure before using it.
+  // Define o tamanho da estrutura
   pe32.dwSize = sizeof(PROCESSENTRY32);
 
-  // Retrieve information about the first process,
-  // and exit if unsuccessful
+  // Recupera informações sobre o primeiro processo
   if (!Process32First(hProcessSnap, &pe32)) {
     printError(TEXT("Process32First")); // show cause of failure
     CloseHandle(hProcessSnap);          // clean the snapshot object
     return;
   }
 
-  // Now walk the snapshot of processes, and
-  // display information about each process in turn
+  // Percorre todos os processos
   do {
     std::wstring ws(pe32.szExeFile);
     std::string name(ws.begin(), ws.end());
@@ -79,7 +78,8 @@ void Model::updateProcesses() {
         (unsigned long)pe32.th32ParentProcessID, (unsigned int)pe32.cntThreads,
         (unsigned int)pe32.pcPriClassBase));
 
-    // Retrieve the priority class.
+    // Adquire a prioridade do processo
+    // https://learn.microsoft.com/pt-br/windows/win32/api/processthreadsapi/nf-processthreadsapi-getpriorityclass
     dwPriorityClass = 0;
     hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
     if (hProcess == NULL)

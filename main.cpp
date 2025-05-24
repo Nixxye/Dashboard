@@ -12,9 +12,9 @@
 #include <winnt.h>
 #include <winscard.h>
 
-#define clockInterval 1000 // 5s
+#define clockInterval 1000 // Intervalo de atualização: 1s
 
-// Mock process list
+// Estrutura para simular processos
 struct MockProcess {
   std::string name;
   unsigned long pid;
@@ -25,7 +25,7 @@ struct MockProcess {
   unsigned long memoryReserved;
   unsigned long numberOfPages;
 };
-
+// Buffers duplos para suavizar transição de dados
 std::vector<MockProcess> processes[2];
 std::vector<std::vector<double>> cpu_usage[2];
 float cpu_total_usage[2];
@@ -35,19 +35,19 @@ int total_threads[2];
 std::vector<double> ram_usage[2];
 short bufferSelector = 0;
 bool running = true;
-
+// Alterna entre os buffers
 void swapViewBuffer() {
   bufferSelector++;
   bufferSelector %= 2;
 }
-
+// Função principal da interface com ImGui
 void show_gui() {
 
   ImGui::Begin("Process Monitor");
 
   ImGui::Text("Running Processes:");
   ImGui::BeginChild("ProcessList", ImVec2(400, 300), true);
-
+  // Exibe lista de processos
   for (auto &proc : processes[bufferSelector]) {
     std::string label =
       std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
@@ -66,24 +66,7 @@ void show_gui() {
 
   ImGui::EndChild();
   ImGui::Separator();
-
-  // Informações totais (CPU, memória, processos, threads)
-  // float total_cpu = 0.0f;
-  // for (auto &val : cpu_usage[bufferSelector]) {
-  //   if (!val.empty())
-  //     total_cpu += val.back(); // último valor de cada núcleo
-  // }
-  // total_cpu /= cpu_usage[bufferSelector].size(); // média
-
-  // float mem_percent = 0.0f;
-  // if (!ram_usage[bufferSelector].empty())
-  //   mem_percent = ram_usage[bufferSelector].back();
-
-  // size_t total_processes = processes[bufferSelector].size();
-  // size_t total_threads = 0;
-  // for (auto &proc : processes[bufferSelector])
-  //   total_threads += proc.threadCount;
-
+  // Exibe resumo do sistema
   ImGui::BeginChild("SystemStats", ImVec2(400, 100), true);
   ImGui::Text("System Summary:");
   ImGui::Text("-> Average CPU Usage: %.1f%%", cpu_total_usage[bufferSelector]);
@@ -94,7 +77,7 @@ void show_gui() {
 
   ImGui::Separator();
 
-  // CPU Usage Grid
+  // Exibe uso de CPU por núcleo
   const int cpu_count = 12;
   const int columns = 4;
 
@@ -116,7 +99,7 @@ void show_gui() {
   ImGui::Columns(1);
 
   ImGui::Separator();
-
+  // Exibe gráfico de uso de RAM
   ImGui::Text("Total Memory Usage:");
   std::vector<float> temp;
   for (auto &element : ram_usage[bufferSelector]) {
@@ -126,21 +109,21 @@ void show_gui() {
 
   ImGui::End();
 }
+// Thread de coleta de dados
 using namespace std::chrono_literals;
 void teste() {
   WindowsInfo::Model model;
   WindowsInfo::System systemInfo = model.getSystemInfo();
   while (running) {
     int current_index = (bufferSelector + 1) % 2;
+    // Copia histórico anterior
     cpu_usage[current_index] = cpu_usage[1 - current_index];
     ram_usage[current_index] = ram_usage[1 - current_index];
-
+    // Atualiza lista de processos
     std::list<WindowsInfo::Process> procList = model.getProcesses();
 
-    int i = 0;
     std::vector<MockProcess> vet;
     vet.clear();
-    // vet.clear();
     total_threads[current_index] = 0;
     for (WindowsInfo::Process p : procList) {
       MockProcess temp;
@@ -154,22 +137,24 @@ void teste() {
       temp.numberOfPages = p.getNumberOfPages();
       vet.push_back(temp);
       total_threads[current_index] += p.getThreadCount();
-      i++;
     }
     processes[current_index] = vet;
+
+    // Atualiza uso por núcleo
     std::vector<double> temp = systemInfo.calculatePerCpuUsage();
-    // for (int i = 0; i < systemInfo.cpuCount; i++) {
-    //   std::cout << "CPU " << i << ": " << temp[i] << std::endl;
-    // }
+
     for (int i = 0; i < systemInfo.cpuCount; i++) {
       cpu_usage[current_index][i].push_back((float)temp[i]);
       if (cpu_usage[current_index][i].size() > 50)
         cpu_usage[current_index][i].erase(cpu_usage[current_index][i].begin());
     }
 
+    // Atualiza uso de memória
     ram_usage[current_index].push_back((float)systemInfo.calculateMemoryUsage());
     if (ram_usage[current_index].size() > 50)
       ram_usage[current_index].erase(ram_usage[current_index].begin());
+
+    // Atualiza totais do sistema
 
     cpu_total_usage[current_index] = ((float)systemInfo.getCpuUsage());
     ram_total_usage[current_index] = (float)systemInfo.getUsedMemory();
@@ -187,6 +172,7 @@ int main() {
     return -1;
   }
 
+  // Inicializa histórico de uso
   WindowsInfo::Model model;
   auto tcpuCount = model.getSystemInfo().cpuCount;
   for (int i = 0; i < tcpuCount; i++) {
@@ -197,10 +183,12 @@ int main() {
   ram_usage[0].resize(50, 0.f);
   ram_usage[1].resize(50, 0.f);
 
+  // Cria janela GLFW
   GLFWwindow *window = glfwCreateWindow(1280, 720, "Dashboard", NULL, NULL);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 
+  // Inicializa ImGui
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -208,8 +196,10 @@ int main() {
 
   ImGui::StyleColorsDark();
 
+  // Inicia thread de monitoramento
   std::thread t(teste);
 
+  // Loop principal
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
 
@@ -217,7 +207,7 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    show_gui();
+    show_gui(); // Renderiza a interface
 
     ImGui::Render();
     int display_w, display_h;
@@ -229,7 +219,8 @@ int main() {
 
     glfwSwapBuffers(window);
   }
-
+  
+  // Encerra ImGui e GLFW
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
