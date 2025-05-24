@@ -13,7 +13,7 @@
 #include <winnt.h>
 #include <winscard.h>
 
-#define clockInterval 1000 // 5s
+#define clockInterval 100 // 5s
 #define MegaByte 1024      
 #define GigaByte 1'048'576 // 1024*1024
 

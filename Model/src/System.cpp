@@ -14,6 +14,38 @@ typedef NTSTATUS(NTAPI* NtQuerySystemInformation_t)(
     PULONG ReturnLength
 );
 
+// https://learn.microsoft.com/pt-br/windows/win32/secauthz/enabling-and-disabling-privileges-in-c--
+bool EnableDebugPrivilege() {
+    HANDLE hToken;
+    LUID luid;
+    TOKEN_PRIVILEGES tp;
+
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
+        std::cerr << "OpenProcessToken failed\n";
+        return false;
+    }
+
+    if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid)) {
+        std::cerr << "LookupPrivilegeValue failed\n";
+        CloseHandle(hToken);
+        return false;
+    }
+
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    if (!AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL)) {
+        std::cerr << "AdjustTokenPrivileges failed\n";
+        CloseHandle(hToken);
+        return false;
+    }
+
+    CloseHandle(hToken);
+    return true;
+}
+
+
 namespace WindowsInfo {
     System::System() {
         SYSTEM_INFO sysInfo;
@@ -22,6 +54,7 @@ namespace WindowsInfo {
         prev_idle.resize(cpuCount, 0);
         prev_kernel.resize(cpuCount, 0);
         prev_user.resize(cpuCount, 0);
+        EnableDebugPrivilege();
     }
 
     System::~System() {

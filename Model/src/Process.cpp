@@ -162,8 +162,11 @@ void Process::loadMemoryInfo() {
       if (protect == PAGE_READWRITE && mbi.AllocationBase == mbi.BaseAddress)
         stackSize += static_cast<unsigned long long>(mbi.RegionSize);
 
+      
+      // https://learn.microsoft.com/pt-br/windows/win32/api/winnt/ns-winnt-memory_basic_information
       if (mbi.Type == MEM_PRIVATE && mbi.State == MEM_COMMIT)
         memoryPrivateCommitedSize += static_cast<unsigned long long>(mbi.RegionSize);
+    
 
       numberOfPages += mbi.RegionSize / PAGE_SIZE;
 
@@ -173,6 +176,8 @@ void Process::loadMemoryInfo() {
     addr += mbi.RegionSize;
   }
 
+  // https://stackoverflow.com/questions/1984186/what-is-private-bytes-virtual-bytes-working-set 
+  // https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo 
   PROCESS_MEMORY_COUNTERS pMemCounters;
   if (GetProcessMemoryInfo(hProcess, &pMemCounters, sizeof(pMemCounters))) {
     this->memoryWorkingSet = pMemCounters.WorkingSetSize/1024;
