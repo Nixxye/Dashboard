@@ -98,9 +98,9 @@ void show_gui() {
 using namespace std::chrono_literals;
 void teste() {
   WindowsInfo::Model model;
+  WindowsInfo::System systemInfo = model.getSystemInfo();
   while (running) {
     std::list<WindowsInfo::Process> procList = model.getProcesses();
-    WindowsInfo::System systemInfo = model.getSystemInfo();
     int i = 0;
     std::vector<MockProcess> vet;
     vet.clear();
@@ -121,6 +121,9 @@ void teste() {
     int current_index = (bufferSelector + 1) % 2;
     processes[current_index] = vet;
     std::vector<double> temp = systemInfo.calculatePerCpuUsage();
+    // for (int i = 0; i < systemInfo.cpuCount; i++) {
+    //   std::cout << "CPU " << i << ": " << temp[i] << std::endl;
+    // }
     for (int i = 0; i < systemInfo.cpuCount; i++) {
       cpu_usage[current_index][i].push_back((float)temp[i]);
       if (cpu_usage[current_index][i].size() > 50)

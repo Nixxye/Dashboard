@@ -23,8 +23,10 @@ namespace WindowsInfo {
     numberOfPages(0),
     threads() {
         HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
-        if( hProcess == NULL )
-            std::cerr << "OpenProcess failed: " << GetLastError() << std::endl;
+        if( hProcess == NULL ) {
+            //std::cerr << "OpenProcess failed: " << GetLastError() << std::endl;
+
+        }
             // printError( TEXT("OpenProcess") );
         else {
             priorityClass = GetPriorityClass( hProcess );
