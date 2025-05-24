@@ -13,13 +13,9 @@
 #include <winnt.h>
 #include <winscard.h>
 
-<<<<<<< HEAD
 #define clockInterval 1000 // 5s
 #define MegaByte 1024      
 #define GigaByte 1'048'576 // 1024*1024
-=======
-#define clockInterval 1000 // Intervalo de atualização: 1s
->>>>>>> f4ffdd28e0f65ccb9d9d5aa3fd43898a92da3d11
 
 // Estrutura para simular processos
 struct MockProcess {
