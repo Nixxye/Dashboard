@@ -19,6 +19,8 @@ namespace WindowsInfo {
         unsigned long long memoryStack;
         unsigned long long memoryCode;
         unsigned long long numberOfPages;
+        unsigned long long memoryWorkingSet;
+        unsigned long long memoryPrivateCommited;
 
         void loadMemoryInfo();
     public:
@@ -33,9 +35,17 @@ namespace WindowsInfo {
         unsigned int getPriorityClass();
         unsigned int getThreadCount();
         std::string getUserName();
+        unsigned long long getMemoryWorkingSet() {
+            if (memoryWorkingSet == 0) loadMemoryInfo();
+            return memoryWorkingSet;
+        }
         unsigned long long getMemoryCommitted() {
             if (memoryCommitted == 0) loadMemoryInfo();
             return memoryCommitted;
+        }
+        unsigned long long getPrivateMemoryCommitted() {
+            if (memoryPrivateCommited == 0) loadMemoryInfo();
+            return memoryPrivateCommited;
         }
         unsigned long long getMemoryReserved() {
             if (memoryReserved == 0) loadMemoryInfo();

@@ -1,5 +1,6 @@
 //https://stackoverflow.com/questions/62898131/correct-way-to-get-windows-cpu-utilization-for-multiprocessor
 
+#include <iterator>
 #include <windows.h>
 #include <iostream>
 #include <vector>

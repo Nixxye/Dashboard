@@ -6,6 +6,7 @@
 
 #include <GLFW/glfw3.h>
 #include <chrono>
+#include <ratio>
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -13,6 +14,8 @@
 #include <winscard.h>
 
 #define clockInterval 1000 // 5s
+#define MegaByte 1024      
+#define GigaByte 1'048'576 // 1024*1024
 
 // Mock process list
 struct MockProcess {
@@ -22,7 +25,9 @@ struct MockProcess {
   unsigned long priorityBase;
   unsigned long priorityClass;
   unsigned long memoryCommitted;
+  unsigned long memoryPrivateCommited;
   unsigned long memoryReserved;
+  unsigned long memoryWorkingSet;
   unsigned long numberOfPages;
 };
 
@@ -50,8 +55,43 @@ void show_gui() {
     if (ImGui::TreeNode(label.c_str())) {
       ImGui::Text("-> Process Name: %s", proc.name.c_str());
       ImGui::Text("-> PID: %lu", proc.pid);
-      ImGui::Text("-> Memory Commited: %luKB", proc.memoryCommitted);
-      ImGui::Text("-> Memory Reserved: %luKB", proc.memoryReserved);
+
+      if (proc.memoryWorkingSet > 999'999)
+        ImGui::Text("-> Memory Working Set: %.1fGB",
+                    (double)proc.memoryWorkingSet / (double)GigaByte);
+      else if (proc.memoryWorkingSet > 999)
+        ImGui::Text("-> Memory Working Set: %.1fMB",
+                    (double)proc.memoryWorkingSet / (double)MegaByte);
+      else
+        ImGui::Text("-> Memory Working Set: %luKB", proc.memoryWorkingSet);
+
+      if (proc.memoryCommitted > 999'999)
+        ImGui::Text("-> Memory Commited: %.1fGB",
+                    (double)proc.memoryCommitted / (double)GigaByte);
+      else if (proc.memoryCommitted > 999)
+        ImGui::Text("-> Memory Commited: %.1fMB",
+                    (double)proc.memoryCommitted / (double)MegaByte);
+      else
+        ImGui::Text("-> Memory Commited: %luKB", proc.memoryCommitted);
+
+      if (proc.memoryPrivateCommited > 999'999)
+        ImGui::Text("-> Private Memory Commited: %.1fGB",
+                    (double)proc.memoryPrivateCommited / (double)GigaByte);
+      else if (proc.memoryPrivateCommited > 999)
+        ImGui::Text("-> Private Memory Commited: %.1fMB",
+                    (double)proc.memoryPrivateCommited / (double)MegaByte);
+      else
+        ImGui::Text("-> Private Memory Commited: %luKB", proc.memoryPrivateCommited);
+
+      if (proc.memoryReserved > 999'999)
+        ImGui::Text("-> Memory Reserved: %.1fGB",
+                    (double)proc.memoryReserved / (double)GigaByte);
+      else if (proc.memoryReserved > 999)
+        ImGui::Text("-> Memory Reserved: %.1fMB",
+                    (double)proc.memoryReserved / (double)MegaByte);
+      else
+        ImGui::Text("-> Memory Reserved: %luKB", proc.memoryReserved);
+
       ImGui::Text("-> Number of Pages: %lu", proc.numberOfPages);
       ImGui::Text("-> Priority Base: %lu", proc.priorityBase);
       ImGui::Text("-> Priority Class: %lu", proc.priorityClass);
@@ -113,7 +153,9 @@ void teste() {
       temp.priorityBase = p.getPriorityBase();
       temp.priorityClass = p.getPriorityClass();
       temp.memoryCommitted = p.getMemoryCommitted();
+      temp.memoryPrivateCommited = p.getPrivateMemoryCommitted();
       temp.memoryReserved = p.getMemoryReserved();
+      temp.memoryWorkingSet = p.getMemoryWorkingSet();
       temp.numberOfPages = p.getNumberOfPages();
       vet.push_back(temp);
       i++;
