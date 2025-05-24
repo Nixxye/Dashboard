@@ -11,108 +11,120 @@
 constexpr size_t PAGE_SIZE = 4096;
 
 namespace WindowsInfo {
-Process::Process(std::string name, unsigned long id, unsigned long parentId,
-                 unsigned int threadCount, unsigned int priorityBase)
-    : name(name), id(id), parentId(parentId), threadCount(threadCount),
-      priorityBase(priorityBase), priorityClass(0), memoryCommitted(0),
-      memoryReserved(0), memoryHeap(0), memoryStack(0), memoryCode(0),
-      numberOfPages(0), threads(), memoryWorkingSet(0), memoryPrivateCommited(0) {
-  HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
-  if (hProcess == NULL)
-    int a;
-  // std::cerr << "OpenProcess failed: " << GetLastError() << std::endl;
-  //  printError( TEXT("OpenProcess") );
-  else {
-    priorityClass = GetPriorityClass(hProcess);
-    if (!priorityClass)
-      std::cerr << "GetPriorityClass failed: " << GetLastError() << std::endl;
-    // printError( TEXT("GetPriorityClass") );
+    Process::Process(std::string name, unsigned long id, unsigned long parentId, unsigned int threadCount, unsigned int priorityBase) :
+    name(name),
+    id(id),
+    parentId(parentId),
+    threadCount(threadCount),
+    priorityBase(priorityBase),
+    priorityClass(0),
+    memoryCommitted(0),
+    memoryReserved(0),
+    memoryHeap(0),
+    memoryStack(0),
+    memoryCode(0),
+    numberOfPages(0),
+    threads(), memoryWorkingSet(0), memoryPrivateCommited(0)   {
+        updateInfo();
+    }
+    void Process::updateInfo() {
+        //Adiciona nome do processo
+        HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
+        if( hProcess == NULL ) {
+            //std::cerr << "OpenProcess failed: " << GetLastError() << std::endl;
 
-    // https://stackoverflow.com/questions/2686096/c-get-username-from-process
-    //  Pega o nome do usuario que iniciou o processo
-    HANDLE hToken = nullptr;
-    if (!OpenProcessToken(hProcess, TOKEN_QUERY, &hToken)) {
-      CloseHandle(hProcess);
-      return;
+            // printError( TEXT("OpenProcess") );
+        }
+        else {
+            priorityClass = GetPriorityClass( hProcess );
+            if( !priorityClass )
+                std::cerr << "GetPriorityClass failed: " << GetLastError() << std::endl;
+                // printError( TEXT("GetPriorityClass") );
+
+            //https://stackoverflow.com/questions/2686096/c-get-username-from-process
+            //https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken
+            // Abre token do processo
+            HANDLE hToken = nullptr;
+            if (!OpenProcessToken(hProcess, TOKEN_QUERY, &hToken)) {
+                CloseHandle(hProcess);
+                return;
+            }
+            // Determina o tamanho necessário do buffer
+            DWORD tokenInfoLength = 0;
+            GetTokenInformation(hToken, TokenUser, nullptr, 0, &tokenInfoLength);
+            if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+                CloseHandle(hToken);
+                CloseHandle(hProcess);
+                return;
+            }
+            // Adquire o token
+            BYTE* tokenInfo = new BYTE[tokenInfoLength];
+            if (!GetTokenInformation(hToken, TokenUser, tokenInfo, tokenInfoLength, &tokenInfoLength)) {
+                delete[] tokenInfo;
+                CloseHandle(hToken);
+                CloseHandle(hProcess);
+                return;
+            }
+
+            TOKEN_USER* tokenUser = reinterpret_cast<TOKEN_USER*>(tokenInfo);
+            WCHAR name[256], domain[256];
+            DWORD nameLen = 256, domainLen = 256;
+            SID_NAME_USE sidType;
+            // https://learn.microsoft.com/pt-br/windows/win32/api/winbase/nf-winbase-lookupaccountsidw
+            // Recupera nome através do SID (identificador do usuário)
+            if (LookupAccountSidW(nullptr, tokenUser->User.Sid, name, &nameLen, domain, &domainLen, &sidType)) {
+                std::wstring wuser = std::wstring(domain) + L"\\" + name;
+                userName = std::string(wuser.begin(), wuser.end()); 
+
+            } else {
+                delete[] tokenInfo;
+                CloseHandle(hToken);
+                CloseHandle(hProcess);
+                return;
+            }
+
+            delete[] tokenInfo;
+            CloseHandle(hToken);
+            CloseHandle( hProcess );
+        }
+    }
+    //https://learn.microsoft.com/en-us/windows/win32/toolhelp/traversing-the-thread-list
+    std::list<Thread> Process::getThreads() {
+        threads.clear();
+        HANDLE hThreadSnap = INVALID_HANDLE_VALUE; 
+        THREADENTRY32 te32; 
+        // Captura todas as threads em execução 
+        hThreadSnap = CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ); 
+        if( hThreadSnap == INVALID_HANDLE_VALUE ) 
+            return std::list<Thread>(); 
+        
+        // Preenche o tamanho da estrutura
+        te32.dwSize = sizeof(THREADENTRY32); 
+        
+        // Recupera informações da primeira thread
+        if( !Thread32First( hThreadSnap, &te32 ) ) 
+        {
+            std::cerr << "Thread32First failed: " << GetLastError() << std::endl;
+            // printError( TEXT("Thread32First") ); // show cause of failure
+            CloseHandle( hThreadSnap );          // clean the snapshot object
+            return std::list<Thread>(); 
+        }
+
+        // Percorre todas as threads verificando se pertencem ao processo
+        do 
+        { 
+            if( te32.th32OwnerProcessID == id )
+            {
+                Thread thread = Thread(te32.th32ThreadID, te32.tpBasePri, te32.tpDeltaPri);
+                threads.push_back(thread);
+            }
+        } while( Thread32Next(hThreadSnap, &te32 ) ); 
+
+        CloseHandle( hThreadSnap );
+        return threads;
     }
 
-    DWORD tokenInfoLength = 0;
-    GetTokenInformation(hToken, TokenUser, nullptr, 0, &tokenInfoLength);
-    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-      CloseHandle(hToken);
-      CloseHandle(hProcess);
-      return;
-    }
-
-    BYTE *tokenInfo = new BYTE[tokenInfoLength];
-    if (!GetTokenInformation(hToken, TokenUser, tokenInfo, tokenInfoLength,
-                             &tokenInfoLength)) {
-      delete[] tokenInfo;
-      CloseHandle(hToken);
-      CloseHandle(hProcess);
-      return;
-    }
-
-    TOKEN_USER *tokenUser = reinterpret_cast<TOKEN_USER *>(tokenInfo);
-    WCHAR name[256], domain[256];
-    DWORD nameLen = 256, domainLen = 256;
-    SID_NAME_USE sidType;
-
-    if (LookupAccountSidW(nullptr, tokenUser->User.Sid, name, &nameLen, domain,
-                          &domainLen, &sidType)) {
-      std::wstring wuser = std::wstring(domain) + L"\\" + name;
-      userName = std::string(wuser.begin(), wuser.end());
-
-    } else {
-      delete[] tokenInfo;
-      CloseHandle(hToken);
-      CloseHandle(hProcess);
-      return;
-    }
-
-    delete[] tokenInfo;
-    CloseHandle(hToken);
-    CloseHandle(hProcess);
-  }
-}
 Process::~Process() {}
-std::list<Thread> Process::getThreads() {
-  if (threads.size() > 0) {
-    return threads;
-  }
-  HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
-  THREADENTRY32 te32;
-  // Take a snapshot of all running threads
-  hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-  if (hThreadSnap == INVALID_HANDLE_VALUE)
-    return std::list<Thread>();
-
-  // Fill in the size of the structure before using it.
-  te32.dwSize = sizeof(THREADENTRY32);
-
-  // Retrieve information about the first thread,
-  // and exit if unsuccessful
-  if (!Thread32First(hThreadSnap, &te32)) {
-    std::cerr << "Thread32First failed: " << GetLastError() << std::endl;
-    // printError( TEXT("Thread32First") ); // show cause of failure
-    CloseHandle(hThreadSnap); // clean the snapshot object
-    return std::list<Thread>();
-  }
-
-  // Now walk the thread list of the system,
-  // and display information about each thread
-  // associated with the specified process
-  do {
-    if (te32.th32OwnerProcessID == id) {
-      Thread thread =
-          Thread(te32.th32ThreadID, te32.tpBasePri, te32.tpDeltaPri);
-      threads.push_back(thread);
-    }
-  } while (Thread32Next(hThreadSnap, &te32));
-
-  CloseHandle(hThreadSnap);
-  return threads;
-}
 unsigned int Process::getPriorityBase() { return priorityBase; }
 unsigned int Process::getPriorityClass() { return priorityClass; }
 unsigned int Process::getThreadCount() { return threadCount; }

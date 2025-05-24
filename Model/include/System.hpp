@@ -10,18 +10,19 @@ namespace WindowsInfo {
         double getCpuUsage();
         double calculateIdleTime();
         double calculateMemoryUsage();
+        float getUsedMemory();
         double calculateDiskUsage();
         int cpuCount;
-
+        float usedMemory;
     private:
-        std::vector<uint64_t> prev_idle = {0};
-        std::vector<uint64_t> prev_kernel = {0};
-        std::vector<uint64_t> prev_user = {0};
-        std::vector<uint64_t> cur_idle = {0};
-        std::vector<uint64_t> cur_ker = {0};
-        std::vector<uint64_t> cur_user = {0};
+        std::vector<LONGLONG> prev_idle;
+        std::vector<LONGLONG> prev_kernel;
+        std::vector<LONGLONG> prev_user;
+        std::vector<LONGLONG> cur_idle;
+        std::vector<LONGLONG> cur_ker;
+        std::vector<LONGLONG> cur_user;
 
-        double cpuUsage = 0.0;
+        double totalCpuUsage = 0.0;
         double idleTime = 0.0;
     };
 }

@@ -13,11 +13,15 @@
 #include <winnt.h>
 #include <winscard.h>
 
+<<<<<<< HEAD
 #define clockInterval 1000 // 5s
 #define MegaByte 1024      
 #define GigaByte 1'048'576 // 1024*1024
+=======
+#define clockInterval 1000 // Intervalo de atualização: 1s
+>>>>>>> f4ffdd28e0f65ccb9d9d5aa3fd43898a92da3d11
 
-// Mock process list
+// Estrutura para simular processos
 struct MockProcess {
   std::string name;
   unsigned long pid;
@@ -30,28 +34,32 @@ struct MockProcess {
   unsigned long memoryWorkingSet;
   unsigned long numberOfPages;
 };
-
+// Buffers duplos para suavizar transição de dados
 std::vector<MockProcess> processes[2];
 std::vector<std::vector<double>> cpu_usage[2];
-std::vector<float> cpu_total_usage[2];
+float cpu_total_usage[2];
+float ram_total_usage[2];
+int total_processes[2];
+int total_threads[2];
+std::vector<double> ram_usage[2];
 short bufferSelector = 0;
 bool running = true;
-
+// Alterna entre os buffers
 void swapViewBuffer() {
   bufferSelector++;
   bufferSelector %= 2;
 }
-
+// Função principal da interface com ImGui
 void show_gui() {
 
   ImGui::Begin("Process Monitor");
 
   ImGui::Text("Running Processes:");
   ImGui::BeginChild("ProcessList", ImVec2(400, 300), true);
-
+  // Exibe lista de processos
   for (auto &proc : processes[bufferSelector]) {
     std::string label =
-        std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
+      std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
     if (ImGui::TreeNode(label.c_str())) {
       ImGui::Text("-> Process Name: %s", proc.name.c_str());
       ImGui::Text("-> PID: %lu", proc.pid);
@@ -102,11 +110,20 @@ void show_gui() {
 
   ImGui::EndChild();
   ImGui::Separator();
+  // Exibe resumo do sistema
+  ImGui::BeginChild("SystemStats", ImVec2(400, 100), true);
+  ImGui::Text("System Summary:");
+  ImGui::Text("-> Average CPU Usage: %.1f%%", cpu_total_usage[bufferSelector]);
+  ImGui::Text("-> Memory Usage: %.2f GB", ram_total_usage[bufferSelector]);
+  ImGui::Text("-> Number of Processes: %zu", total_processes[bufferSelector]);
+  ImGui::Text("-> Total Threads: %zu", total_threads[bufferSelector]);
+  ImGui::EndChild();
 
-  // CPU Usage Grid
-  const int cpu_count = 12;  // mock 8 logical CPUs
-  const int columns = 4;     // grid layout: 4 columns
-  const int graph_size = 50; // history length
+  ImGui::Separator();
+
+  // Exibe uso de CPU por núcleo
+  const int cpu_count = 12;
+  const int columns = 4;
 
   ImGui::Text("Per-Core CPU Usage:");
   ImGui::Columns(columns, "cpu_columns", false);
@@ -119,32 +136,39 @@ void show_gui() {
     std::string label = "CPU " + std::to_string(i);
     ImGui::Text("%s", label.c_str());
     ImGui::PlotLines(("##" + label).c_str(), temp.data(),
-                     cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
-                     1.0f, ImVec2(-1, 60));
+                      cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
+                      1.0f, ImVec2(-1, 60));
     ImGui::NextColumn();
   }
-  ImGui::Columns(1); // reset
+  ImGui::Columns(1);
 
   ImGui::Separator();
-
+  // Exibe gráfico de uso de RAM
   ImGui::Text("Total Memory Usage:");
-  static float mem[50] = {};
-  memmove(mem, mem + 1, sizeof(mem) - sizeof(float));
-  mem[49] = (rand() % 100) / 100.0f;
-  ImGui::PlotLines("##MEM", mem, 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
+  std::vector<float> temp;
+  for (auto &element : ram_usage[bufferSelector]) {
+    temp.push_back(element / 100);
+  }
+  ImGui::PlotLines("##MEM", temp.data(), 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
 
   ImGui::End();
 }
+// Thread de coleta de dados
 using namespace std::chrono_literals;
 void teste() {
   WindowsInfo::Model model;
+  WindowsInfo::System systemInfo = model.getSystemInfo();
   while (running) {
+    int current_index = (bufferSelector + 1) % 2;
+    // Copia histórico anterior
+    cpu_usage[current_index] = cpu_usage[1 - current_index];
+    ram_usage[current_index] = ram_usage[1 - current_index];
+    // Atualiza lista de processos
     std::list<WindowsInfo::Process> procList = model.getProcesses();
-    WindowsInfo::System systemInfo = model.getSystemInfo();
-    int i = 0;
+
     std::vector<MockProcess> vet;
     vet.clear();
-    // vet.clear();
+    total_threads[current_index] = 0;
     for (WindowsInfo::Process p : procList) {
       MockProcess temp;
       temp.pid = p.id;
@@ -158,44 +182,59 @@ void teste() {
       temp.memoryWorkingSet = p.getMemoryWorkingSet();
       temp.numberOfPages = p.getNumberOfPages();
       vet.push_back(temp);
-      i++;
+      total_threads[current_index] += p.getThreadCount();
     }
-    int current_index = (bufferSelector + 1) % 2;
     processes[current_index] = vet;
+
+    // Atualiza uso por núcleo
     std::vector<double> temp = systemInfo.calculatePerCpuUsage();
+
     for (int i = 0; i < systemInfo.cpuCount; i++) {
       cpu_usage[current_index][i].push_back((float)temp[i]);
       if (cpu_usage[current_index][i].size() > 50)
         cpu_usage[current_index][i].erase(cpu_usage[current_index][i].begin());
     }
-    cpu_total_usage[current_index].push_back((float)systemInfo.getCpuUsage());
-    if (cpu_total_usage[current_index].size() > 50)
-      cpu_total_usage[current_index].erase(
-          cpu_total_usage[current_index].begin());
+
+    // Atualiza uso de memória
+    ram_usage[current_index].push_back((float)systemInfo.calculateMemoryUsage());
+    if (ram_usage[current_index].size() > 50)
+      ram_usage[current_index].erase(ram_usage[current_index].begin());
+
+    // Atualiza totais do sistema
+
+    cpu_total_usage[current_index] = ((float)systemInfo.getCpuUsage());
+    ram_total_usage[current_index] = (float)systemInfo.getUsedMemory();
+
+    total_processes[current_index] = processes[current_index].size();
+     
 
     swapViewBuffer();
     std::this_thread::sleep_for(std::chrono::milliseconds(clockInterval));
   }
 }
-
 int main() {
   if (!glfwInit()) {
     running = false;
     return -1;
   }
 
+  // Inicializa histórico de uso
   WindowsInfo::Model model;
   auto tcpuCount = model.getSystemInfo().cpuCount;
   for (int i = 0; i < tcpuCount; i++) {
     std::vector<double> temp(50, 0.f);
-    cpu_usage[0].push_back(temp); // vai por cópia?
+    cpu_usage[0].push_back(temp);
     cpu_usage[1].push_back(temp);
   }
+  ram_usage[0].resize(50, 0.f);
+  ram_usage[1].resize(50, 0.f);
 
+  // Cria janela GLFW
   GLFWwindow *window = glfwCreateWindow(1280, 720, "Dashboard", NULL, NULL);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 
+  // Inicializa ImGui
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -203,8 +242,10 @@ int main() {
 
   ImGui::StyleColorsDark();
 
+  // Inicia thread de monitoramento
   std::thread t(teste);
 
+  // Loop principal
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
 
@@ -212,7 +253,7 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    show_gui();
+    show_gui(); // Renderiza a interface
 
     ImGui::Render();
     int display_w, display_h;
@@ -224,7 +265,8 @@ int main() {
 
     glfwSwapBuffers(window);
   }
-
+  
+  // Encerra ImGui e GLFW
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
