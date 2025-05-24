@@ -28,7 +28,11 @@ struct MockProcess {
 
 std::vector<MockProcess> processes[2];
 std::vector<std::vector<double>> cpu_usage[2];
-std::vector<float> cpu_total_usage[2];
+float cpu_total_usage[2];
+float ram_total_usage[2];
+int total_processes[2];
+int total_threads[2];
+std::vector<double> ram_usage[2];
 short bufferSelector = 0;
 bool running = true;
 
@@ -46,7 +50,7 @@ void show_gui() {
 
   for (auto &proc : processes[bufferSelector]) {
     std::string label =
-        std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
+      std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
     if (ImGui::TreeNode(label.c_str())) {
       ImGui::Text("-> Process Name: %s", proc.name.c_str());
       ImGui::Text("-> PID: %lu", proc.pid);
@@ -63,10 +67,36 @@ void show_gui() {
   ImGui::EndChild();
   ImGui::Separator();
 
+  // Informações totais (CPU, memória, processos, threads)
+  // float total_cpu = 0.0f;
+  // for (auto &val : cpu_usage[bufferSelector]) {
+  //   if (!val.empty())
+  //     total_cpu += val.back(); // último valor de cada núcleo
+  // }
+  // total_cpu /= cpu_usage[bufferSelector].size(); // média
+
+  // float mem_percent = 0.0f;
+  // if (!ram_usage[bufferSelector].empty())
+  //   mem_percent = ram_usage[bufferSelector].back();
+
+  // size_t total_processes = processes[bufferSelector].size();
+  // size_t total_threads = 0;
+  // for (auto &proc : processes[bufferSelector])
+  //   total_threads += proc.threadCount;
+
+  ImGui::BeginChild("SystemStats", ImVec2(400, 100), true);
+  ImGui::Text("System Summary:");
+  ImGui::Text("-> Average CPU Usage: %.1f%%", cpu_total_usage[bufferSelector]);
+  ImGui::Text("-> Memory Usage: %.2f GB", ram_total_usage[bufferSelector]);
+  ImGui::Text("-> Number of Processes: %zu", total_processes[bufferSelector]);
+  ImGui::Text("-> Total Threads: %zu", total_threads[bufferSelector]);
+  ImGui::EndChild();
+
+  ImGui::Separator();
+
   // CPU Usage Grid
-  const int cpu_count = 12;  // mock 8 logical CPUs
-  const int columns = 4;     // grid layout: 4 columns
-  const int graph_size = 50; // history length
+  const int cpu_count = 12;
+  const int columns = 4;
 
   ImGui::Text("Per-Core CPU Usage:");
   ImGui::Columns(columns, "cpu_columns", false);
@@ -79,19 +109,20 @@ void show_gui() {
     std::string label = "CPU " + std::to_string(i);
     ImGui::Text("%s", label.c_str());
     ImGui::PlotLines(("##" + label).c_str(), temp.data(),
-                     cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
-                     1.0f, ImVec2(-1, 60));
+                      cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
+                      1.0f, ImVec2(-1, 60));
     ImGui::NextColumn();
   }
-  ImGui::Columns(1); // reset
+  ImGui::Columns(1);
 
   ImGui::Separator();
 
   ImGui::Text("Total Memory Usage:");
-  static float mem[50] = {};
-  memmove(mem, mem + 1, sizeof(mem) - sizeof(float));
-  mem[49] = (rand() % 100) / 100.0f;
-  ImGui::PlotLines("##MEM", mem, 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
+  std::vector<float> temp;
+  for (auto &element : ram_usage[bufferSelector]) {
+    temp.push_back(element / 100);
+  }
+  ImGui::PlotLines("##MEM", temp.data(), 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
 
   ImGui::End();
 }
@@ -100,11 +131,17 @@ void teste() {
   WindowsInfo::Model model;
   WindowsInfo::System systemInfo = model.getSystemInfo();
   while (running) {
+    int current_index = (bufferSelector + 1) % 2;
+    cpu_usage[current_index] = cpu_usage[1 - current_index];
+    ram_usage[current_index] = ram_usage[1 - current_index];
+
     std::list<WindowsInfo::Process> procList = model.getProcesses();
+
     int i = 0;
     std::vector<MockProcess> vet;
     vet.clear();
     // vet.clear();
+    total_threads[current_index] = 0;
     for (WindowsInfo::Process p : procList) {
       MockProcess temp;
       temp.pid = p.id;
@@ -116,9 +153,9 @@ void teste() {
       temp.memoryReserved = p.getMemoryReserved();
       temp.numberOfPages = p.getNumberOfPages();
       vet.push_back(temp);
+      total_threads[current_index] += p.getThreadCount();
       i++;
     }
-    int current_index = (bufferSelector + 1) % 2;
     processes[current_index] = vet;
     std::vector<double> temp = systemInfo.calculatePerCpuUsage();
     // for (int i = 0; i < systemInfo.cpuCount; i++) {
@@ -129,16 +166,21 @@ void teste() {
       if (cpu_usage[current_index][i].size() > 50)
         cpu_usage[current_index][i].erase(cpu_usage[current_index][i].begin());
     }
-    cpu_total_usage[current_index].push_back((float)systemInfo.getCpuUsage());
-    if (cpu_total_usage[current_index].size() > 50)
-      cpu_total_usage[current_index].erase(
-          cpu_total_usage[current_index].begin());
+
+    ram_usage[current_index].push_back((float)systemInfo.calculateMemoryUsage());
+    if (ram_usage[current_index].size() > 50)
+      ram_usage[current_index].erase(ram_usage[current_index].begin());
+
+    cpu_total_usage[current_index] = ((float)systemInfo.getCpuUsage());
+    ram_total_usage[current_index] = (float)systemInfo.getUsedMemory();
+
+    total_processes[current_index] = processes[current_index].size();
+     
 
     swapViewBuffer();
     std::this_thread::sleep_for(std::chrono::milliseconds(clockInterval));
   }
 }
-
 int main() {
   if (!glfwInit()) {
     running = false;
@@ -149,9 +191,11 @@ int main() {
   auto tcpuCount = model.getSystemInfo().cpuCount;
   for (int i = 0; i < tcpuCount; i++) {
     std::vector<double> temp(50, 0.f);
-    cpu_usage[0].push_back(temp); // vai por cópia?
+    cpu_usage[0].push_back(temp);
     cpu_usage[1].push_back(temp);
   }
+  ram_usage[0].resize(50, 0.f);
+  ram_usage[1].resize(50, 0.f);
 
   GLFWwindow *window = glfwCreateWindow(1280, 720, "Dashboard", NULL, NULL);
   glfwMakeContextCurrent(window);

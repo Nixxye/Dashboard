@@ -10,9 +10,10 @@ namespace WindowsInfo {
         double getCpuUsage();
         double calculateIdleTime();
         double calculateMemoryUsage();
+        float getUsedMemory();
         double calculateDiskUsage();
         int cpuCount;
-
+        float usedMemory;
     private:
         std::vector<LONGLONG> prev_idle;
         std::vector<LONGLONG> prev_kernel;

@@ -98,12 +98,15 @@ namespace WindowsInfo {
         for (double u : usages) sum += u;
         totalCpuUsage = sum / cpuCount;
         // std::cout << "Total CPU Usage: " << totalCpuUsage << std::endl;
+        // std::cout << "CPU 0 Usage: " << usages[0] << std::endl;
         // std::cout << "-------------------------" << std::endl;
+
 
         return usages;
     }
 
     double System::getCpuUsage() {
+        std::cout << "Total CPU Usage: " << totalCpuUsage << std::endl;
         return totalCpuUsage;
     }
 
@@ -117,7 +120,8 @@ namespace WindowsInfo {
 
         if (GlobalMemoryStatusEx(&memStatus)) {
             // Porcentagem de memória usada
-            double usedMemory = memStatus.ullTotalPhys - memStatus.ullAvailPhys;
+            usedMemory = memStatus.ullTotalPhys - memStatus.ullAvailPhys;
+            std::cout << "Used Memory: " << usedMemory << std::endl;
             return (usedMemory * 100.0) / memStatus.ullTotalPhys;
         } else {
             // Se falhar, retorna 0
@@ -125,7 +129,9 @@ namespace WindowsInfo {
             return 0.0;
         }
     }
-
+    float System::getUsedMemory() {
+        return usedMemory / 1024 / 1024 / 1024;
+    }
     double System::calculateDiskUsage() {
         return 0.0;
     }
