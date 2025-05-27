@@ -13,11 +13,19 @@
 #include <winnt.h>
 #include <winscard.h>
 
-#define clockInterval 100 // 5s
+#define clockInterval 20 // 5s
 #define MegaByte 1024      
 #define GigaByte 1'048'576 // 1024*1024
 
+WindowsInfo::Model model;
+
 // Estrutura para simular processos
+struct MockThread {
+  unsigned long threadId;
+  unsigned int priorityBase;
+  unsigned int priorityDelta;
+};
+
 struct MockProcess {
   std::string name;
   unsigned long pid;
@@ -29,7 +37,26 @@ struct MockProcess {
   unsigned long memoryReserved;
   unsigned long memoryWorkingSet;
   unsigned long numberOfPages;
+  std::string userName; 
+  unsigned long parentId;
+  std::vector<MockThread> threads;
 };
+
+std::vector<MockThread> getThreadInfoForProcess(WindowsInfo::Process& process) {
+  std::vector<MockThread> threads;
+  std::list<WindowsInfo::Thread> threadList = process.getThreads(); 
+
+  for (WindowsInfo::Thread th : threadList) {
+    MockThread t;
+    t.threadId = th.id;
+    t.priorityBase = th.getPriorityBase();
+    t.priorityDelta = th.getPriorityDelta();
+    threads.push_back(t);
+  }
+  return threads;
+}
+
+
 // Buffers duplos para suavizar transição de dados
 std::vector<MockProcess> processes[2];
 std::vector<std::vector<double>> cpu_usage[2];
@@ -58,7 +85,10 @@ void show_gui() {
       std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
     if (ImGui::TreeNode(label.c_str())) {
       ImGui::Text("-> Process Name: %s", proc.name.c_str());
+      ImGui::Text("-> User: %s", proc.userName.c_str());
       ImGui::Text("-> PID: %lu", proc.pid);
+      ImGui::Text("-> ParentID: %lu", proc.parentId);
+
 
       if (proc.memoryWorkingSet > 999'999)
         ImGui::Text("-> Memory Working Set: %.1fGB",
@@ -99,7 +129,28 @@ void show_gui() {
       ImGui::Text("-> Number of Pages: %lu", proc.numberOfPages);
       ImGui::Text("-> Priority Base: %lu", proc.priorityBase);
       ImGui::Text("-> Priority Class: %lu", proc.priorityClass);
-      ImGui::Text("-> Number of Threads: %lu", proc.threadCount);
+      std::string threadLabel = "-> Number of Threads: " + std::to_string(proc.threadCount);
+      if (ImGui::TreeNodeEx(threadLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (proc.threads.empty()) {
+          // Busca processo original para carregar threads
+          auto procList = model.getProcesses();
+          for (WindowsInfo::Process realProc : procList) {
+            if (realProc.id == proc.pid) {
+              proc.threads = getThreadInfoForProcess(realProc);
+              break;
+            }
+          }
+        }
+
+        for (const auto& t : proc.threads) {
+          ImGui::Separator();
+          ImGui::Text("Thread ID: %lu", t.threadId);
+          ImGui::Text("Base Priority: %u", t.priorityBase);
+          ImGui::Text("Priority Delta: %u", t.priorityDelta);
+        }
+
+        ImGui::TreePop();
+      }
       ImGui::TreePop();
     }
   }
@@ -152,7 +203,6 @@ void show_gui() {
 // Thread de coleta de dados
 using namespace std::chrono_literals;
 void teste() {
-  WindowsInfo::Model model;
   WindowsInfo::System systemInfo = model.getSystemInfo();
   while (running) {
     int current_index = (bufferSelector + 1) % 2;
@@ -165,7 +215,10 @@ void teste() {
     std::vector<MockProcess> vet;
     vet.clear();
     total_threads[current_index] = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+
     for (WindowsInfo::Process p : procList) {
+      p.updateInfo(); // Atualiza informações do processo
       MockProcess temp;
       temp.pid = p.id;
       temp.name = p.name;
@@ -177,6 +230,19 @@ void teste() {
       temp.memoryReserved = p.getMemoryReserved();
       temp.memoryWorkingSet = p.getMemoryWorkingSet();
       temp.numberOfPages = p.getNumberOfPages();
+      temp.userName = p.getUserName();
+      temp.parentId = p.parentId;
+
+      // auto threadList = p.getThreads(); // retorna std::list<WindowsInfo::Thread>
+
+      // for (WindowsInfo::Thread th : threadList) {
+      //   MockThread t;
+      //   t.threadId = th.id;
+      //   t.priorityBase = th.getPriorityBase();
+      //   t.priorityDelta = th.getPriorityDelta();
+      //   temp.threads.push_back(t);
+      // }
+
       vet.push_back(temp);
       total_threads[current_index] += p.getThreadCount();
     }
