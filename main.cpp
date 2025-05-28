@@ -14,7 +14,7 @@
 #include <winscard.h>
 
 #define clockInterval 20 // 5s
-#define MegaByte 1024      
+#define MegaByte 1024
 #define GigaByte 1'048'576 // 1024*1024
 
 WindowsInfo::Model model;
@@ -37,14 +37,14 @@ struct MockProcess {
   unsigned long memoryReserved;
   unsigned long memoryWorkingSet;
   unsigned long numberOfPages;
-  std::string userName; 
+  std::string userName;
   unsigned long parentId;
   std::vector<MockThread> threads;
 };
 
-std::vector<MockThread> getThreadInfoForProcess(WindowsInfo::Process& process) {
+std::vector<MockThread> getThreadInfoForProcess(WindowsInfo::Process &process) {
   std::vector<MockThread> threads;
-  std::list<WindowsInfo::Thread> threadList = process.getThreads(); 
+  std::list<WindowsInfo::Thread> threadList = process.getThreads();
 
   for (WindowsInfo::Thread th : threadList) {
     MockThread t;
@@ -55,7 +55,6 @@ std::vector<MockThread> getThreadInfoForProcess(WindowsInfo::Process& process) {
   }
   return threads;
 }
-
 
 // Buffers duplos para suavizar transição de dados
 std::vector<MockProcess> processes[2];
@@ -82,13 +81,12 @@ void show_gui() {
   // Exibe lista de processos
   for (auto &proc : processes[bufferSelector]) {
     std::string label =
-      std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
+        std::string(proc.name) + " (PID: " + std::to_string(proc.pid) + ")";
     if (ImGui::TreeNode(label.c_str())) {
       ImGui::Text("-> Process Name: %s", proc.name.c_str());
       ImGui::Text("-> User: %s", proc.userName.c_str());
       ImGui::Text("-> PID: %lu", proc.pid);
       ImGui::Text("-> ParentID: %lu", proc.parentId);
-
 
       if (proc.memoryWorkingSet > 999'999)
         ImGui::Text("-> Memory Working Set: %.1fGB",
@@ -115,7 +113,8 @@ void show_gui() {
         ImGui::Text("-> Private Memory Commited: %.1fMB",
                     (double)proc.memoryPrivateCommited / (double)MegaByte);
       else
-        ImGui::Text("-> Private Memory Commited: %luKB", proc.memoryPrivateCommited);
+        ImGui::Text("-> Private Memory Commited: %luKB",
+                    proc.memoryPrivateCommited);
 
       if (proc.memoryReserved > 999'999)
         ImGui::Text("-> Memory Reserved: %.1fGB",
@@ -129,27 +128,36 @@ void show_gui() {
       ImGui::Text("-> Number of Pages: %lu", proc.numberOfPages);
       ImGui::Text("-> Priority Base: %lu", proc.priorityBase);
       ImGui::Text("-> Priority Class: %lu", proc.priorityClass);
-      std::string threadLabel = "-> Number of Threads: " + std::to_string(proc.threadCount);
-      if (ImGui::TreeNodeEx(threadLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-        if (proc.threads.empty()) {
-          // Busca processo original para carregar threads
+      std::string threadLabel =
+          "-> Number of Threads: " + std::to_string(proc.threadCount);
+
+      static std::vector<MockThread> threadsInfo;
+
+      if (ImGui::Button(threadLabel.c_str())){
+        ImGui::OpenPopup("Threads Details");
           auto procList = model.getProcesses();
           for (WindowsInfo::Process realProc : procList) {
             if (realProc.id == proc.pid) {
               proc.threads = getThreadInfoForProcess(realProc);
+              threadsInfo = proc.threads;
               break;
             }
           }
-        }
 
-        for (const auto& t : proc.threads) {
+      }
+
+      bool open = true;
+      if (ImGui::BeginPopupModal("Threads Details", &open)) {
+        for (const auto &t : threadsInfo) {
           ImGui::Separator();
           ImGui::Text("Thread ID: %lu", t.threadId);
           ImGui::Text("Base Priority: %u", t.priorityBase);
           ImGui::Text("Priority Delta: %u", t.priorityDelta);
         }
 
-        ImGui::TreePop();
+        if (ImGui::Button("Close"))
+          ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
       }
       ImGui::TreePop();
     }
@@ -183,8 +191,8 @@ void show_gui() {
     std::string label = "CPU " + std::to_string(i);
     ImGui::Text("%s", label.c_str());
     ImGui::PlotLines(("##" + label).c_str(), temp.data(),
-                      cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
-                      1.0f, ImVec2(-1, 60));
+                     cpu_usage[bufferSelector][i].size(), 0, nullptr, 0.0f,
+                     1.0f, ImVec2(-1, 60));
     ImGui::NextColumn();
   }
   ImGui::Columns(1);
@@ -196,7 +204,8 @@ void show_gui() {
   for (auto &element : ram_usage[bufferSelector]) {
     temp.push_back(element / 100);
   }
-  ImGui::PlotLines("##MEM", temp.data(), 50, 0, nullptr, 0.0f, 1.0f, ImVec2(400, 100));
+  ImGui::PlotLines("##MEM", temp.data(), 50, 0, nullptr, 0.0f, 1.0f,
+                   ImVec2(400, 100));
 
   ImGui::End();
 }
@@ -233,7 +242,8 @@ void teste() {
       temp.userName = p.getUserName();
       temp.parentId = p.parentId;
 
-      // auto threadList = p.getThreads(); // retorna std::list<WindowsInfo::Thread>
+      // auto threadList = p.getThreads(); // retorna
+      // std::list<WindowsInfo::Thread>
 
       // for (WindowsInfo::Thread th : threadList) {
       //   MockThread t;
@@ -258,7 +268,8 @@ void teste() {
     }
 
     // Atualiza uso de memória
-    ram_usage[current_index].push_back((float)systemInfo.calculateMemoryUsage());
+    ram_usage[current_index].push_back(
+        (float)systemInfo.calculateMemoryUsage());
     if (ram_usage[current_index].size() > 50)
       ram_usage[current_index].erase(ram_usage[current_index].begin());
 
@@ -268,7 +279,6 @@ void teste() {
     ram_total_usage[current_index] = (float)systemInfo.getUsedMemory();
 
     total_processes[current_index] = processes[current_index].size();
-     
 
     swapViewBuffer();
     std::this_thread::sleep_for(std::chrono::milliseconds(clockInterval));
@@ -327,7 +337,7 @@ int main() {
 
     glfwSwapBuffers(window);
   }
-  
+
   // Encerra ImGui e GLFW
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
