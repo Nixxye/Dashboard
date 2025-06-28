@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 namespace WindowsInfo {
@@ -11,7 +13,7 @@ namespace WindowsInfo {
         ~Thread();
 
         unsigned long id;
-        unsigned int getPriorityBase();
-        unsigned int getPriorityDelta();
+        unsigned int getPriorityBase() const;
+        unsigned int getPriorityDelta() const;
     };
 }

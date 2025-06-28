@@ -1,4 +1,7 @@
+#ifdef _WIN32
+#include <winsock2.h>
 #include <windows.h>
+#endif
 #include <tlhelp32.h>
 #include <tchar.h>
 #include <stdio.h>
