@@ -9,10 +9,10 @@ namespace WindowsInfo {
     Thread::~Thread() {
         
     }
-    unsigned int Thread::getPriorityBase() const{
+    unsigned int Thread::getPriorityBase(){
         return priorityBase;
     }
-    unsigned int Thread::getPriorityDelta() const{
+    unsigned int Thread::getPriorityDelta(){
         return priorityDelta;
     }
 }

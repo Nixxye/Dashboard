@@ -33,7 +33,7 @@ namespace WindowsInfo {
         // Endpoint que retorna o conteúdo do buffer protegido
         CROW_ROUTE(app, "/buffer").methods(crow::HTTPMethod::Get)([this]() {
             std::lock_guard<std::mutex> lock(mtx);
-            return buffer;
+            return modelBuffer;
         });
 
         app.port(8000).multithreaded().run();
@@ -46,7 +46,7 @@ namespace WindowsInfo {
 
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                buffer = "Atualizado: " + std::to_string(counter++);
+                modelBuffer = to_json(model);
                 data_ready = true;
             }
             cv.notify_all();

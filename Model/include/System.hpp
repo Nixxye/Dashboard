@@ -8,12 +8,12 @@ namespace WindowsInfo {
         System();
         ~System();
 
-        std::vector<double> calculatePerCpuUsage();
-        double getCpuUsage();
-        double calculateIdleTime();
+        std::vector<double> calculatePerCpuUsage() ;
+        double getCpuUsage() ;
+        double calculateIdleTime() ;
         double calculateMemoryUsage();
-        float getUsedMemory();
-        double calculateDiskUsage();
+        float getUsedMemory() ;
+        double calculateDiskUsage() ;
         int cpuCount;
         float usedMemory;
     private:

@@ -13,7 +13,7 @@ namespace WindowsInfo {
         ~Thread();
 
         unsigned long id;
-        unsigned int getPriorityBase() const;
-        unsigned int getPriorityDelta() const;
+        unsigned int getPriorityBase();
+        unsigned int getPriorityDelta();
     };
 }

@@ -62,7 +62,7 @@ namespace WindowsInfo {
     }
     // https://web.archive.org/web/20150215064443/http://support.microsoft.com/kb/287158
     //https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntquerysysteminformation
-    std::vector<double> System::calculatePerCpuUsage() {
+    std::vector<double> System::calculatePerCpuUsage(){
         std::vector<double> usages(cpuCount, 0.0);
         // Carregar dll por conta do mingw:
         HMODULE hNtDll = LoadLibraryW(L"ntdll.dll");
@@ -113,7 +113,7 @@ namespace WindowsInfo {
         return usages;
     }
 
-    double System::getCpuUsage() {
+    double System::getCpuUsage()  {
         return totalCpuUsage;
     }
 
@@ -122,7 +122,7 @@ namespace WindowsInfo {
     }
     // https://learn.microsoft.com/pt-br/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex
     // https://learn.microsoft.com/pt-br/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex
-    double System::calculateMemoryUsage() {
+    double System::calculateMemoryUsage(){
         MEMORYSTATUSEX memStatus;
         memStatus.dwLength = sizeof(memStatus);
 

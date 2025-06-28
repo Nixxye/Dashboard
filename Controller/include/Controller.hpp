@@ -19,7 +19,7 @@ namespace WindowsInfo {
     private:
         Model model;
         crow::SimpleApp app;
-
+        crow::json::wvalue modelBuffer;
         std::string buffer;
         std::mutex mtx;
         std::condition_variable cv;

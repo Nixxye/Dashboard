@@ -64,6 +64,25 @@
         "sstream": "cpp",
         "unordered_map": "cpp",
         "xhash": "cpp",
-        "condition_variable": "cpp"
+        "condition_variable": "cpp",
+        "any": "cpp",
+        "array": "cpp",
+        "codecvt": "cpp",
+        "coroutine": "cpp",
+        "csignal": "cpp",
+        "cstdarg": "cpp",
+        "deque": "cpp",
+        "resumable": "cpp",
+        "filesystem": "cpp",
+        "fstream": "cpp",
+        "future": "cpp",
+        "map": "cpp",
+        "mutex": "cpp",
+        "queue": "cpp",
+        "set": "cpp",
+        "source_location": "cpp",
+        "unordered_set": "cpp",
+        "variant": "cpp",
+        "xtree": "cpp"
     }
 }
