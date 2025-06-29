@@ -25,7 +25,7 @@ namespace WindowsInfo {
 
     void Controller::initServer() {
         using namespace std::placeholders;
-
+        app.get_middleware<CORSHandler>();
         CROW_ROUTE(app, "/")([]() {
             return "Hello, World";
         });

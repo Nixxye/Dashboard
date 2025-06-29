@@ -2,6 +2,7 @@
 #include "../../Model/include/Model.hpp"
 #include "../../Include/crow_all.h"
 #include "../../Include/ToJson.hpp"
+#include "CorsMiddleware.hpp"
 #include <string>
 #include <thread>
 #include <mutex>
@@ -18,7 +19,7 @@ namespace WindowsInfo {
 
     private:
         Model model;
-        crow::SimpleApp app;
+        crow::App<CORSHandler> app;
         crow::json::wvalue modelBuffer;
         std::string buffer;
         std::mutex mtx;
