@@ -42,11 +42,11 @@ namespace WindowsInfo {
     void Controller::updatePipes() {
         int counter = 0;
         while (true) {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            crow::json::wvalue buffer = model.to_json();
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                modelBuffer = to_json(model);
+                modelBuffer = crow::json::wvalue(buffer);  // força nova instância (cópia)
                 data_ready = true;
             }
             cv.notify_all();

@@ -95,4 +95,23 @@ void Model::updateProcesses() {
 
   CloseHandle(hProcessSnap);
 }
+crow::json::wvalue Model::to_json() {
+    crow::json::wvalue j;
+
+    // Serializa a lista de processos
+    crow::json::wvalue processesJson = crow::json::wvalue::list();
+    int index = 0;
+    for (auto& process : getProcesses()) {
+        processesJson[index++] = process.to_json();
+    }
+    j["processes"] = std::move(processesJson);
+
+    // Serializa o objeto System
+    j["systemInfo"] = systemInfo.to_json();
+
+    // Opcional: adicionar contagem total de threads
+    j["threadCount"] = getThreadCount();
+
+    return j;
+}
 } // namespace WindowsInfo

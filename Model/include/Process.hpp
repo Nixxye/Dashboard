@@ -1,4 +1,9 @@
 #pragma once
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+#endif
+#include <crow_all.h>
 #include <iostream>
 #include <list>
 #include <string>
@@ -37,6 +42,7 @@ namespace WindowsInfo {
         unsigned int getPriorityClass();
         unsigned int getThreadCount();
         std::string getUserName();
+        crow::json::wvalue to_json();
         unsigned long long getMemoryWorkingSet() {
             if (memoryWorkingSet == 0) loadMemoryInfo();
             return memoryWorkingSet;

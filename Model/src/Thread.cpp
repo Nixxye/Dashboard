@@ -15,4 +15,11 @@ namespace WindowsInfo {
     unsigned int Thread::getPriorityDelta(){
         return priorityDelta;
     }
+    crow::json::wvalue Thread::to_json() {
+        crow::json::wvalue j;
+        j["id"] = id;
+        j["priorityBase"] = priorityBase;
+        j["priorityDelta"] = priorityDelta;
+        return j;
+    }
 }

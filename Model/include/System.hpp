@@ -1,5 +1,5 @@
 #pragma once
-
+#include <crow_all.h>
 #include <stdint.h>
 #include <vector>
 namespace WindowsInfo {
@@ -16,6 +16,7 @@ namespace WindowsInfo {
         double calculateDiskUsage() ;
         int cpuCount;
         float usedMemory;
+        crow::json::wvalue to_json();
     private:
         std::vector<LONGLONG> prev_idle;
         std::vector<LONGLONG> prev_kernel;

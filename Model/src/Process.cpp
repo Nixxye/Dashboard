@@ -127,72 +127,101 @@ namespace WindowsInfo {
         return threads;
     }
 
-Process::~Process() {}
-unsigned int Process::getPriorityBase() { return priorityBase; }
-unsigned int Process::getPriorityClass() { return priorityClass; }
-unsigned int Process::getThreadCount() { return threadCount; }
-std::string Process::getUserName() { return userName; }
-void Process::loadMemoryInfo() {
-  // N achei info, aqui foi chat na veia -> pesquisar na doc dps
-  HANDLE hProcess =
-      OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, id);
-  if (!hProcess) {
-    // std::cerr << "OpenProcess failed in loadMemoryInfo: " << GetLastError()
-    // << std::endl;
-    return;
-  }
+    Process::~Process() {}
+    unsigned int Process::getPriorityBase() { return priorityBase; }
+    unsigned int Process::getPriorityClass() { return priorityClass; }
+    unsigned int Process::getThreadCount() { return threadCount; }
+    std::string Process::getUserName() { return userName; }
+    void Process::loadMemoryInfo() {
+      // N achei info, aqui foi chat na veia -> pesquisar na doc dps
+      HANDLE hProcess =
+          OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, id);
+      if (!hProcess) {
+        // std::cerr << "OpenProcess failed in loadMemoryInfo: " << GetLastError()
+        // << std::endl;
+        return;
+      }
 
-  MEMORY_BASIC_INFORMATION mbi;
-  uintptr_t addr = 0;
+      MEMORY_BASIC_INFORMATION mbi;
+      uintptr_t addr = 0;
 
-  unsigned long long totalCommitted = 0, totalReserved = 0, totalFree = 0;
-  unsigned long long heapSize = 0, stackSize = 0, codeSize = 0;
-  unsigned long long pageReadable = 0, pageWritable = 0, memoryPrivateCommitedSize = 0, pageExecutable = 0;
-  numberOfPages = 0;
-  while (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(addr), &mbi,
-                        sizeof(mbi)) == sizeof(mbi)) {
-    if (mbi.State == MEM_COMMIT) {
-      totalCommitted += static_cast<unsigned long long>(mbi.RegionSize);
+      unsigned long long totalCommitted = 0, totalReserved = 0, totalFree = 0;
+      unsigned long long heapSize = 0, stackSize = 0, codeSize = 0;
+      unsigned long long pageReadable = 0, pageWritable = 0, memoryPrivateCommitedSize = 0, pageExecutable = 0;
+      numberOfPages = 0;
+      while (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(addr), &mbi,
+                            sizeof(mbi)) == sizeof(mbi)) {
+        if (mbi.State == MEM_COMMIT) {
+          totalCommitted += static_cast<unsigned long long>(mbi.RegionSize);
 
-      DWORD protect = mbi.Protect;
+          DWORD protect = mbi.Protect;
 
-      // Heurísticas para heap, stack e código
-      if (protect == PAGE_READWRITE && mbi.Type == MEM_PRIVATE)
-        heapSize += static_cast<unsigned long long>(mbi.RegionSize);
-      if ((protect & PAGE_EXECUTE) || (protect & PAGE_EXECUTE_READ) ||
-          (protect & PAGE_EXECUTE_READWRITE))
-        codeSize += static_cast<unsigned long long>(mbi.RegionSize);
-      if (protect == PAGE_READWRITE && mbi.AllocationBase == mbi.BaseAddress)
-        stackSize += static_cast<unsigned long long>(mbi.RegionSize);
+          // Heurísticas para heap, stack e código
+          if (protect == PAGE_READWRITE && mbi.Type == MEM_PRIVATE)
+            heapSize += static_cast<unsigned long long>(mbi.RegionSize);
+          if ((protect & PAGE_EXECUTE) || (protect & PAGE_EXECUTE_READ) ||
+              (protect & PAGE_EXECUTE_READWRITE))
+            codeSize += static_cast<unsigned long long>(mbi.RegionSize);
+          if (protect == PAGE_READWRITE && mbi.AllocationBase == mbi.BaseAddress)
+            stackSize += static_cast<unsigned long long>(mbi.RegionSize);
 
-      
-      // https://learn.microsoft.com/pt-br/windows/win32/api/winnt/ns-winnt-memory_basic_information
-      if (mbi.Type == MEM_PRIVATE && mbi.State == MEM_COMMIT)
-        memoryPrivateCommitedSize += static_cast<unsigned long long>(mbi.RegionSize);
-    
+          
+          // https://learn.microsoft.com/pt-br/windows/win32/api/winnt/ns-winnt-memory_basic_information
+          if (mbi.Type == MEM_PRIVATE && mbi.State == MEM_COMMIT)
+            memoryPrivateCommitedSize += static_cast<unsigned long long>(mbi.RegionSize);
+        
 
-      numberOfPages += mbi.RegionSize / PAGE_SIZE;
+          numberOfPages += mbi.RegionSize / PAGE_SIZE;
 
-    } else if (mbi.State == MEM_RESERVE) {
-      totalReserved += static_cast<unsigned long long>(mbi.RegionSize);
+        } else if (mbi.State == MEM_RESERVE) {
+          totalReserved += static_cast<unsigned long long>(mbi.RegionSize);
+        }
+        addr += mbi.RegionSize;
+      }
+
+      // https://stackoverflow.com/questions/1984186/what-is-private-bytes-virtual-bytes-working-set 
+      // https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo 
+      PROCESS_MEMORY_COUNTERS pMemCounters;
+      if (GetProcessMemoryInfo(hProcess, &pMemCounters, sizeof(pMemCounters))) {
+        this->memoryWorkingSet = pMemCounters.WorkingSetSize/1024;
+      }
+
+      CloseHandle(hProcess);
+
+      this->memoryCommitted = totalCommitted / 1024;
+      this->memoryPrivateCommited = memoryPrivateCommitedSize / 1024;
+      this->memoryReserved = totalReserved / 1024;
+      this->memoryHeap = heapSize / 1024;
+      this->memoryStack = stackSize / 1024;
+      this->memoryCode = codeSize / 1024;
     }
-    addr += mbi.RegionSize;
-  }
+    crow::json::wvalue Process::to_json() {
+        crow::json::wvalue j;
+        j["id"] = id;
+        j["parentId"] = parentId;
+        j["name"] = name;
+        j["threadCount"] = threadCount;
+        j["priorityBase"] = priorityBase;
+        j["priorityClass"] = priorityClass;
+        j["userName"] = userName;
 
-  // https://stackoverflow.com/questions/1984186/what-is-private-bytes-virtual-bytes-working-set 
-  // https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo 
-  PROCESS_MEMORY_COUNTERS pMemCounters;
-  if (GetProcessMemoryInfo(hProcess, &pMemCounters, sizeof(pMemCounters))) {
-    this->memoryWorkingSet = pMemCounters.WorkingSetSize/1024;
-  }
+        j["memoryWorkingSet"] = getMemoryWorkingSet();
+        j["memoryCommitted"] = getMemoryCommitted();
+        j["privateMemoryCommitted"] = getPrivateMemoryCommitted();
+        j["memoryReserved"] = getMemoryReserved();
+        j["memoryHeap"] = getMemoryHeap();
+        j["memoryStack"] = getMemoryStack();
+        j["memoryCode"] = getMemoryCode();
+        j["numberOfPages"] = getNumberOfPages();
 
-  CloseHandle(hProcess);
+        // Serializa a lista de threads
+        crow::json::wvalue threadsJson = crow::json::wvalue::list();
+        int index = 0;
+        for ( auto& thread : getThreads()) {
+            threadsJson[index++] = thread.to_json();
+        }
+        j["threads"] = std::move(threadsJson);
 
-  this->memoryCommitted = totalCommitted / 1024;
-  this->memoryPrivateCommited = memoryPrivateCommitedSize / 1024;
-  this->memoryReserved = totalReserved / 1024;
-  this->memoryHeap = heapSize / 1024;
-  this->memoryStack = stackSize / 1024;
-  this->memoryCode = codeSize / 1024;
-}
+        return j;
+    }
 } // namespace WindowsInfo

@@ -4,6 +4,7 @@
 #include <winsock2.h>
 #include <windows.h>
 #endif
+#include <crow_all.h>
 #include <tlhelp32.h>
 #include <tchar.h>
 #include <stdio.h>
@@ -27,5 +28,6 @@ namespace WindowsInfo {
         WindowsInfo::System getSystemInfo();
         int getThreadCount();
         void updateProcesses();
+        crow::json::wvalue to_json();
     };
 }

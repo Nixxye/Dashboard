@@ -1,7 +1,10 @@
 //https://stackoverflow.com/questions/62898131/correct-way-to-get-windows-cpu-utilization-for-multiprocessor
-
 #include <iterator>
+
+#ifdef _WIN32
+#include <winsock2.h>
 #include <windows.h>
+#endif
 #include <winternl.h>
 #include <iostream>
 #include <vector>
@@ -142,6 +145,24 @@ namespace WindowsInfo {
     }
     double System::calculateDiskUsage() {
         return 0.0;
+    }
+    crow::json::wvalue System::to_json() {
+        crow::json::wvalue j;
+        j["cpuCount"] = cpuCount;
+
+        j["idleTime"] = calculateIdleTime();
+        j["memoryUsage"] = calculateMemoryUsage();
+        j["diskUsage"] = calculateDiskUsage();
+
+        auto perCpu = calculatePerCpuUsage();
+        crow::json::wvalue perCpuJson;
+        for (size_t i = 0; i < perCpu.size(); ++i) {
+            perCpuJson[std::to_string(i)] = perCpu[i];
+        }
+        j["perCpuUsage"] = std::move(perCpuJson);
+        j["cpuUsage"] = getCpuUsage();
+        j["usedMemory"] = getUsedMemory();
+        return j;
     }
 }
 

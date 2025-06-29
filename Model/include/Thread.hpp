@@ -1,5 +1,5 @@
 #pragma once
-
+#include <crow_all.h>
 #include <string>
 
 namespace WindowsInfo {
@@ -15,5 +15,6 @@ namespace WindowsInfo {
         unsigned long id;
         unsigned int getPriorityBase();
         unsigned int getPriorityDelta();
+        crow::json::wvalue to_json();
     };
 }
