@@ -80,7 +80,7 @@ watch(() => props.systemInfo, (newVal) => {
   }
 
   // Atualiza gráfico de memória (imutável)
-  const usedMB = newVal.usedMemory / 1024 / 1024
+  const usedMB = newVal.usedMemory
   const totalMB = usedMB / (newVal.memoryUsage / 100)
   const freeMB = Math.max(totalMB - usedMB, 0)
 
