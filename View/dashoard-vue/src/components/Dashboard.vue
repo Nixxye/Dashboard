@@ -53,6 +53,11 @@
   onUnmounted(() => {
     if (timeoutId) clearTimeout(timeoutId)
   })
+  const selectedThreadIndex = ref<number | null>(null)
+
+  function selectThread(index: number) {
+    selectedThreadIndex.value = selectedThreadIndex.value === index ? null : index
+  }
 </script>
 
 
@@ -79,27 +84,46 @@
         </li>
       </ul>
 
-      <div class="process-details" v-if="selectedProcessId !== null">
-        <h3>Detalhes do Processo</h3>
-        <div 
-          v-for="proc in data.processes" 
-          :key="'details-' + proc.id" 
-          v-show="proc.id.toString() === selectedProcessId"
-        >
-          <p><strong>Threads:</strong> {{ proc.threadCount }}</p>
-          <p><strong>Priority Base:</strong> {{ proc.priorityBase }}</p>
-          <p><strong>Priority Class:</strong> {{ proc.priorityClass }}</p>
-          <p><strong>Usuário:</strong> {{ proc.userName }}</p>
-          <p><strong>Memória Working Set:</strong> {{ (proc.memoryWorkingSet / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Memória Committed:</strong> {{ (proc.memoryCommitted / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Memória Privada Committed:</strong> {{ (proc.privateMemoryCommitted / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Memória Reservada:</strong> {{ (proc.memoryReserved / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Memória Heap:</strong> {{ (proc.memoryHeap / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Memória Stack:</strong> {{ (proc.memoryStack / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Memória Code:</strong> {{ (proc.memoryCode / 1024 / 1024).toFixed(2) }} MB</p>
-          <p><strong>Número de Páginas:</strong> {{ proc.numberOfPages }}</p>
+    <div class="process-details" v-if="selectedProcessId !== null">
+      <h3>Detalhes do Processo</h3>
+      <div 
+        v-for="proc in data.processes" 
+        :key="'details-' + proc.id" 
+        v-show="proc.id.toString() === selectedProcessId"
+      >
+      <p><strong>Priority Base:</strong> {{ proc.priorityBase }}</p>
+      <p><strong>Priority Class:</strong> {{ proc.priorityClass }}</p>
+      <p><strong>Usuário:</strong> {{ proc.userName }}</p>
+      <p><strong>Memória Working Set:</strong> {{ (proc.memoryWorkingSet / 1024).toFixed(2) }} MB</p>
+      <p><strong>Memória Committed:</strong> {{ (proc.memoryCommitted / 1024).toFixed(2) }} MB</p>
+      <p><strong>Memória Privada Committed:</strong> {{ (proc.privateMemoryCommitted / 1024).toFixed(2) }} MB</p>
+      <p><strong>Memória Reservada:</strong> {{ (proc.memoryReserved / 1024).toFixed(2) }} MB</p>
+      <p><strong>Memória Heap:</strong> {{ (proc.memoryHeap / 1024).toFixed(2) }} MB</p>
+      <p><strong>Memória Stack:</strong> {{ (proc.memoryStack / 1024).toFixed(2) }} MB</p>
+      <p><strong>Memória Code:</strong> {{ (proc.memoryCode / 1024).toFixed(2) }} MB</p>
+      <p><strong>Número de Páginas:</strong> {{ proc.numberOfPages }}</p>
+        <h4 style="margin-top: 1rem;">Threads: {{ proc.threadCount }} </h4>
+        <ul class="thread-list">
+          <li
+            v-for="(thread, index) in proc.threads"
+            :key="'thread-' + thread.id"
+            @click="selectThread(index)"
+            :class="{ selected: selectedThreadIndex === index }"
+          >
+            Thread {{ thread.id }}
+          </li>
+        </ul>
+
+        <div v-if="selectedThreadIndex !== null">
+          <h4>Detalhes da Thread</h4>
+          <div v-if="proc.threads[selectedThreadIndex]">
+            <p><strong>ID:</strong> {{ proc.threads[selectedThreadIndex].id }}</p>
+            <p><strong>Priority Base:</strong> {{ proc.threads[selectedThreadIndex].priorityBase }}</p>
+            <p><strong>Priority Delta:</strong> {{ proc.threads[selectedThreadIndex].priorityDelta }}</p>
+          </div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>

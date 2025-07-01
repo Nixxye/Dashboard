@@ -26,7 +26,7 @@ const memoryData = ref({
   labels: ['Usada', 'Livre'],
   datasets: [
     {
-      label: 'Memória (MB)',
+      label: 'Memória (GB)',
       backgroundColor: ['#f87979', '#7acbf9'],
       data: [] as number[],
     }
