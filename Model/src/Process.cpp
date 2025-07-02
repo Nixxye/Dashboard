@@ -221,7 +221,14 @@ namespace WindowsInfo {
 
     void Process::loadHandles() {
         // Limpa lista antiga
-        handles.clear();
+        semaphores.clear();
+        mutexes.clear();
+        diskFiles.clear();
+        charFiles.clear();
+        pipeFiles.clear();
+        unknownFiles.clear();
+        directories.clear();
+        devices.clear();
 
         // Abre handle do processo para duplicar handles
         HANDLE hProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, id);
@@ -274,7 +281,33 @@ namespace WindowsInfo {
             {
                 // Cria objeto Handle com dupHandle
                 Handle handleObj(dupHandle);
-                handles.push_back(handleObj);
+                if (handleObj.type == L"Mutant") {
+                    mutexes.push_back(handleObj);
+                } else if (handleObj.type == L"Sempahore") {
+                    semaphores.push_back(handleObj);
+                } else if (handleObj.type == L"File") {
+                    // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletype
+                    switch (GetFileType(handleObj.handleValue)) {
+                        case FILE_TYPE_CHAR:
+                            charFiles.push_back(handleObj);
+                            break;
+                        case FILE_TYPE_DISK:
+                            diskFiles.push_back(handleObj);
+                            break;
+                        case FILE_TYPE_PIPE:
+                            pipeFiles.push_back(handleObj);
+                            break;        
+                        case FILE_TYPE_UNKNOWN:
+                            unknownFiles.push_back(handleObj);
+                            break;    
+                        default:
+                            break;                                          
+                    }
+                } else if (handleObj.type == L"Directory") {
+                    directories.push_back(handleObj);
+                } else if (handleObj.type == L"Device") {
+                    devices.push_back(handleObj);
+                }
                 CloseHandle(dupHandle);
             }
         }
@@ -316,12 +349,61 @@ namespace WindowsInfo {
         j["threads"] = std::move(threadsJson);
         // Serializa a lista de handles
         loadHandles();
-        crow::json::wvalue handlesJson = crow::json::wvalue::list();
+        crow::json::wvalue semaphoresJson = crow::json::wvalue::list();
         index = 0;
-        for (auto& handle : handles) {
-            handlesJson[index++] = handle.to_json();
+        for (auto& handle : semaphores) {
+            semaphoresJson[index++] = handle.to_json();
         }
-        j["handles"] = std::move(handlesJson);
+        j["semaphores"] = std::move(semaphoresJson);
+
+        crow::json::wvalue mutexesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : mutexes) {
+            mutexesJson[index++] = handle.to_json();
+        }
+        j["mutexes"] = std::move(mutexesJson);
+
+        crow::json::wvalue diskFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : diskFiles) {
+            diskFilesJson[index++] = handle.to_json();
+        }
+        j["diskFiles"] = std::move(diskFilesJson);
+
+        crow::json::wvalue charFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : charFiles) {
+            charFilesJson[index++] = handle.to_json();
+        }
+        j["charFiles"] = std::move(charFilesJson);
+
+        crow::json::wvalue pipeFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : pipeFiles) {
+            pipeFilesJson[index++] = handle.to_json();
+        }
+        j["pipeFiles"] = std::move(pipeFilesJson);
+
+        crow::json::wvalue unknownFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : unknownFiles) {
+            unknownFilesJson[index++] = handle.to_json();
+        }
+        j["unknownFiles"] = std::move(unknownFilesJson);
+
+        crow::json::wvalue directoriesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : directories) {
+            directoriesJson[index++] = handle.to_json();
+        }
+        j["directories"] = std::move(directoriesJson);
+
+        crow::json::wvalue devicesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : devices) {
+            devicesJson[index++] = handle.to_json();
+        }
+        j["devices"] = std::move(devicesJson);
         return j;
     }
 } // namespace WindowsInfo

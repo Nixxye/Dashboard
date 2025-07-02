@@ -47,7 +47,7 @@ namespace WindowsInfo {
         }
 
         // Se for do tipo File, tenta obter o nome (caminho)
-        if (type == L"File") {
+        if (type == L"File" || type == L"Directory") {
             BYTE nameBuffer[0x1000] = {};
             returnLength = 0;
             if (NtQueryObject(handleValue, ObjectNameInformation, nameBuffer, sizeof(nameBuffer), &returnLength) == 0) {

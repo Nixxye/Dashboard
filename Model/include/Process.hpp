@@ -16,7 +16,15 @@ namespace WindowsInfo {
     class Process {
     private:
         std::list<Thread> threads;
-        std::list<Handle> handles;
+        std::list<Handle> semaphores;
+        std::list<Handle> mutexes;
+        std::list<Handle> diskFiles;
+        std::list<Handle> charFiles;
+        std::list<Handle> pipeFiles;
+        std::list<Handle> unknownFiles;
+        
+        std::list<Handle> directories;
+        std::list<Handle> devices;
         std::string userName;
         unsigned int threadCount;
         unsigned int priorityBase;

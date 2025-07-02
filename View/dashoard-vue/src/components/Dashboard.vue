@@ -141,13 +141,75 @@
             </div>
           </div>
 
-          <h4 style="margin-top: 1rem;">Handles: {{ selectedProcessData.handles.length }}</h4>
-          <ul class="handle-list">
-            <li v-for="(handle, hIndex) in selectedProcessData.handles" :key="'handle-' + hIndex">
-              <strong>Tipo:</strong> {{ handle.type }}<br>
-              <strong>Nome:</strong> {{ handle.name || '(sem nome)' }}
-            </li>
-          </ul>
+          <!-- Semáforos -->
+          <div v-if="selectedProcessData.semaphores && selectedProcessData.semaphores.length">
+            <h4>Semáforos: {{ selectedProcessData.semaphores.length }}</h4>
+          </div>
+
+          <!-- Mutexes -->
+          <div v-if="selectedProcessData.mutexes && selectedProcessData.mutexes.length">
+            <h4>Mutexes: {{ selectedProcessData.mutexes.length }}</h4>
+          </div>
+
+          <!-- Arquivos em Disco -->
+          <div v-if="selectedProcessData.diskFiles && selectedProcessData.diskFiles.length">
+            <h4>Arquivos em Disco: {{ selectedProcessData.diskFiles.length }}</h4>
+            <ul class="handle-list">
+              <li v-for="(handle, index) in selectedProcessData.diskFiles" :key="'diskFile-' + index">
+                <template v-if="handle.name">{{ handle.name }}</template>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Dispositivos de Caracteres -->
+          <div v-if="selectedProcessData.charFiles && selectedProcessData.charFiles.length">
+            <h4>Dispositivos de Caracteres: {{ selectedProcessData.charFiles.length }}</h4>
+            <ul class="handle-list">
+              <li v-for="(handle, index) in selectedProcessData.charFiles" :key="'charFile-' + index">
+                <template v-if="handle.name">{{ handle.name }}</template>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Pipes -->
+          <div v-if="selectedProcessData.pipeFiles && selectedProcessData.pipeFiles.length">
+            <h4>Pipes: {{ selectedProcessData.pipeFiles.length }}</h4>
+            <ul class="handle-list">
+              <li v-for="(handle, index) in selectedProcessData.pipeFiles" :key="'pipeFile-' + index">
+                <template v-if="handle.name">{{ handle.name }}</template>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Arquivos Desconhecidos -->
+          <div v-if="selectedProcessData.unknownFiles && selectedProcessData.unknownFiles.length">
+            <h4>Arquivos Desconhecidos: {{ selectedProcessData.unknownFiles.length }}</h4>
+            <ul class="handle-list">
+              <li v-for="(handle, index) in selectedProcessData.unknownFiles" :key="'unknownFile-' + index">
+                <template v-if="handle.name">{{ handle.name }}</template>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Diretórios -->
+          <div v-if="selectedProcessData.directories && selectedProcessData.directories.length">
+            <h4>Diretórios: {{ selectedProcessData.directories.length }}</h4>
+            <ul class="handle-list">
+              <li v-for="(handle, index) in selectedProcessData.directories" :key="'directory-' + index">
+                <template v-if="handle.name">{{ handle.name }}</template>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Dispositivos -->
+          <div v-if="selectedProcessData.devices && selectedProcessData.devices.length">
+            <h4>Dispositivos: {{ selectedProcessData.devices.length }}</h4>
+            <ul class="handle-list">
+              <li v-for="(handle, index) in selectedProcessData.devices" :key="'device-' + index">
+                <template v-if="handle.name">{{ handle.name }}</template>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div v-else>
