@@ -26,92 +26,105 @@ void printError(TCHAR const *msg) {
 
 namespace WindowsInfo {
 
-Model::Model() : processes(), systemInfo() { updateProcesses(); }
-
-Model::~Model() { processes.clear(); }
-
-std::list<WindowsInfo::Process> Model::getProcesses() {
-  updateProcesses();
-  return processes;
-}
-
-WindowsInfo::System Model::getSystemInfo() { return systemInfo; }
-int Model::getThreadCount() {
-  int threadCount = 0;
-  for (WindowsInfo::Process process : processes) {
-    threadCount += process.getThreadCount();
-  }
-  return threadCount;
-}
-// https://learn.microsoft.com/pt-br/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes
-void Model::updateProcesses() {
-  processes.clear();
-
-  HANDLE hProcessSnap;
-  HANDLE hProcess;
-  PROCESSENTRY32 pe32;
-  DWORD dwPriorityClass;
-
-  // Captura todos os processos em execução
-  hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  if (hProcessSnap == INVALID_HANDLE_VALUE) {
-    printError(TEXT("CreateToolhelp32Snapshot (of processes)"));
-    return;
+  Model::Model() : processes(), systemInfo() { 
+    std::cout << "Criando model" << std::endl;
+    updateProcesses(); 
   }
 
-  // Define o tamanho da estrutura
-  pe32.dwSize = sizeof(PROCESSENTRY32);
+  Model::~Model() { processes.clear(); }
 
-  // Recupera informações sobre o primeiro processo
-  if (!Process32First(hProcessSnap, &pe32)) {
-    printError(TEXT("Process32First")); // show cause of failure
-    CloseHandle(hProcessSnap);          // clean the snapshot object
-    return;
+  std::list<WindowsInfo::Process> Model::getProcesses() {
+    updateProcesses();
+    return processes;
   }
 
-  // Percorre todos os processos
-  do {
-    std::wstring ws(pe32.szExeFile);
-    std::string name(ws.begin(), ws.end());
-    processes.push_back(WindowsInfo::Process(
-        name, (unsigned long)pe32.th32ProcessID,
-        (unsigned long)pe32.th32ParentProcessID, (unsigned int)pe32.cntThreads,
-        (unsigned int)pe32.pcPriClassBase));
+  WindowsInfo::System Model::getSystemInfo() { return systemInfo; }
+  int Model::getThreadCount() {
+    int threadCount = 0;
+    for (WindowsInfo::Process process : processes) {
+      threadCount += process.getThreadCount();
+    }
+    return threadCount;
+  }
+  // https://learn.microsoft.com/pt-br/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes
+  void Model::updateProcesses() {
+    processes.clear();
 
-    // Adquire a prioridade do processo
-    // https://learn.microsoft.com/pt-br/windows/win32/api/processthreadsapi/nf-processthreadsapi-getpriorityclass
-    dwPriorityClass = 0;
-    hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
-    if (hProcess == NULL)
-      printError(TEXT("OpenProcess"));
-    else {
-      dwPriorityClass = GetPriorityClass(hProcess);
-      if (!dwPriorityClass)
-        printError(TEXT("GetPriorityClass"));
-      CloseHandle(hProcess);
+    HANDLE hProcessSnap;
+    HANDLE hProcess;
+    PROCESSENTRY32 pe32;
+    DWORD dwPriorityClass;
+    // Captura todos os processos em execução
+    hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hProcessSnap == INVALID_HANDLE_VALUE) {
+      printError(TEXT("CreateToolhelp32Snapshot (of processes)"));
+      return;
     }
 
-  } while (Process32Next(hProcessSnap, &pe32));
+    // Define o tamanho da estrutura
+    pe32.dwSize = sizeof(PROCESSENTRY32);
 
-  CloseHandle(hProcessSnap);
-}
-crow::json::wvalue Model::to_json() {
-    crow::json::wvalue j;
-
-    // Serializa a lista de processos
-    crow::json::wvalue processesJson = crow::json::wvalue::list();
-    int index = 0;
-    for (auto& process : getProcesses()) {
-        processesJson[index++] = process.to_json();
+    // Recupera informações sobre o primeiro processo
+    if (!Process32First(hProcessSnap, &pe32)) {
+      printError(TEXT("Process32First")); // show cause of failure
+      CloseHandle(hProcessSnap);          // clean the snapshot object
+      return;
     }
-    j["processes"] = std::move(processesJson);
+    // Percorre todos os processos
+    do {
+      std::wstring ws(pe32.szExeFile);
+      std::string name(ws.begin(), ws.end());
+      processes.push_back(WindowsInfo::Process(
+          name, (unsigned long)pe32.th32ProcessID,
+          (unsigned long)pe32.th32ParentProcessID, (unsigned int)pe32.cntThreads,
+          (unsigned int)pe32.pcPriClassBase));
+      // Adquire a prioridade do processo
+      // https://learn.microsoft.com/pt-br/windows/win32/api/processthreadsapi/nf-processthreadsapi-getpriorityclass
+      dwPriorityClass = 0;
+      hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+      if (hProcess == NULL)
+        printError(TEXT("OpenProcess"));
+      else {
+        dwPriorityClass = GetPriorityClass(hProcess);
+        if (!dwPriorityClass)
+          printError(TEXT("GetPriorityClass"));
+        CloseHandle(hProcess);
+      }
 
-    // Serializa o objeto System
-    j["systemInfo"] = systemInfo.to_json();
+    } while (Process32Next(hProcessSnap, &pe32));
 
-    // Opcional: adicionar contagem total de threads
-    j["threadCount"] = getThreadCount();
+    CloseHandle(hProcessSnap);
+  }
+  crow::json::wvalue Model::to_json() {
+      crow::json::wvalue j;
 
-    return j;
-}
+      // Serializa a lista de processos
+      crow::json::wvalue processesJson = crow::json::wvalue::list();
+      int index = 0;
+      for (auto& process : getProcesses()) {
+          processesJson[index++] = process.to_json_simple();
+      }
+      j["processes"] = std::move(processesJson);
+
+      // Serializa o objeto System
+      j["systemInfo"] = systemInfo.to_json();
+
+      // Opcional: adicionar contagem total de threads
+      j["threadCount"] = getThreadCount();
+
+      return j;
+  }
+  crow::json::wvalue Model::get_process_json(int processId) {
+      for (auto& process : processes) {
+          if (process.id == static_cast<unsigned long>(processId)) {
+              return process.to_json();
+          }
+      }
+
+      // Caso o processo não seja encontrado
+      crow::json::wvalue notFound;
+      notFound["error"] = "Processo não encontrado";
+      notFound["id"] = processId;
+      return notFound;
+  }
 } // namespace WindowsInfo

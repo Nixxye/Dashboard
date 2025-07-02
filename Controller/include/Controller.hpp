@@ -25,7 +25,7 @@ namespace WindowsInfo {
         std::mutex mtx;
         std::condition_variable cv;
         bool data_ready;
-
+        std::thread server_thread;
         std::thread updater_thread;
     };
 }

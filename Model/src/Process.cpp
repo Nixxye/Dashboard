@@ -7,9 +7,11 @@
 #include <tchar.h>
 #include <tlhelp32.h>
 #include <winnt.h>
-
-
 #include "../include/Process.hpp"
+
+#ifndef STATUS_INFO_LENGTH_MISMATCH
+#define STATUS_INFO_LENGTH_MISMATCH ((NTSTATUS)0xC0000004)
+#endif
 
 constexpr size_t PAGE_SIZE = 4096;
 
@@ -90,6 +92,7 @@ namespace WindowsInfo {
             CloseHandle(hToken);
             CloseHandle( hProcess );
         }
+        // loadHandles();
     }
     //https://learn.microsoft.com/en-us/windows/win32/toolhelp/traversing-the-thread-list
     std::list<Thread> Process::getThreads() {
@@ -195,6 +198,96 @@ namespace WindowsInfo {
       this->memoryStack = stackSize / 1024;
       this->memoryCode = codeSize / 1024;
     }
+    struct SYSTEM_HANDLE_TABLE_ENTRY_INFO {
+        USHORT UniqueProcessId;
+        USHORT CreatorBackTraceIndex;
+        BYTE ObjectTypeNumber;
+        BYTE Flags;
+        USHORT Handle;
+        PVOID Object;
+        ACCESS_MASK GrantedAccess;
+    };
+
+    struct SYSTEM_HANDLE_INFORMATION {
+        ULONG NumberOfHandles;
+        SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
+    };
+
+    using NtQuerySystemInformation_t = NTSTATUS(WINAPI*)(
+        ULONG SystemInformationClass,
+        PVOID SystemInformation,
+        ULONG SystemInformationLength,
+        PULONG ReturnLength);
+
+    void Process::loadHandles() {
+        // Limpa lista antiga
+        handles.clear();
+
+        // Abre handle do processo para duplicar handles
+        HANDLE hProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, id);
+        if (!hProcess) return;
+
+        // Pega ponteiro para NtQuerySystemInformation
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (!hNtdll) {
+            CloseHandle(hProcess);
+            return;
+        }
+        auto NtQuerySystemInformation = (NtQuerySystemInformation_t)GetProcAddress(hNtdll, "NtQuerySystemInformation");
+        if (!NtQuerySystemInformation) {
+            CloseHandle(hProcess);
+            return;
+        }
+
+        ULONG bufferSize = 0x10000;
+        std::vector<BYTE> buffer(bufferSize);
+        ULONG returnLength = 0;
+        NTSTATUS status;
+
+        // Tenta até buffer ser suficiente
+        while ((status = NtQuerySystemInformation(16 /*SystemHandleInformation*/, buffer.data(), bufferSize, &returnLength)) == STATUS_INFO_LENGTH_MISMATCH) {
+            bufferSize *= 2;
+            buffer.resize(bufferSize);
+        }
+        if (status != 0) { // sucesso é zero
+            CloseHandle(hProcess);
+            return;
+        }
+
+        auto handleInfo = reinterpret_cast<SYSTEM_HANDLE_INFORMATION*>(buffer.data());
+        for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
+            auto& h = handleInfo->Handles[i];
+
+            if ((DWORD)h.UniqueProcessId != id)
+                continue; // Só handles do processo atual
+
+            // Duplicar handle para processo atual (se possível)
+            HANDLE dupHandle = nullptr;
+            if (DuplicateHandle(
+                OpenProcess(PROCESS_ALL_ACCESS, FALSE, h.UniqueProcessId),
+                (HANDLE)(uintptr_t)h.Handle,
+                GetCurrentProcess(),
+                &dupHandle,
+                0,
+                FALSE,
+                DUPLICATE_SAME_ACCESS)) 
+            {
+                // Cria objeto Handle com dupHandle
+                Handle handleObj(dupHandle);
+                handles.push_back(handleObj);
+                CloseHandle(dupHandle);
+            }
+        }
+
+        CloseHandle(hProcess);
+    }
+    crow::json::wvalue Process::to_json_simple() {
+        crow::json::wvalue j;
+        j["id"] = id;
+        j["parentId"] = parentId;
+        j["name"] = name;
+        return j;
+    }
     crow::json::wvalue Process::to_json() {
         crow::json::wvalue j;
         j["id"] = id;
@@ -221,7 +314,14 @@ namespace WindowsInfo {
             threadsJson[index++] = thread.to_json();
         }
         j["threads"] = std::move(threadsJson);
-
+        // Serializa a lista de handles
+        loadHandles();
+        crow::json::wvalue handlesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : handles) {
+            handlesJson[index++] = handle.to_json();
+        }
+        j["handles"] = std::move(handlesJson);
         return j;
     }
 } // namespace WindowsInfo

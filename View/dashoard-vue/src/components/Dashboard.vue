@@ -6,7 +6,8 @@
   const loading = ref(true)
   const error = ref<string | null>(null)
   const selectedProcessId = ref<string | null>(null)
-  const systemInfo = ref<any>(null)  
+  const systemInfo = ref<any>(null) 
+  const selectedProcessData = ref<any>(null) 
   let timeoutId: number | undefined = undefined
 
   const firstLoad = ref(true)
@@ -34,17 +35,35 @@
       timeoutId = window.setTimeout(fetchData, 2000)
     }
   }
+  async function selectProcess(id: number | string) {
+    const idStr = id.toString()
+
+    if (selectedProcessId.value === idStr) {
+      selectedProcessId.value = null
+      selectedProcessData.value = null
+      selectedThreadIndex.value = null
+      return
+    }
+
+    selectedProcessId.value = idStr
+    selectedThreadIndex.value = null
+    selectedProcessData.value = null
+
+    try {
+      const res = await fetch(`http://localhost:8000/process/${id}`)
+      if (!res.ok) throw new Error(`Erro ao buscar detalhes do processo ${id}`)
+      selectedProcessData.value = await res.json()
+    } catch (err: any) {
+      console.error(err)
+      selectedProcessData.value = { error: 'Erro ao carregar detalhes' }
+    }
+  }
 
   watch(data, (newData) => {
     if (newData && newData.systemInfo) {
       systemInfo.value = { ...newData.systemInfo }
     }
   }, { immediate: true })
-
-  function selectProcess(id: number | string) {
-    const idStr = id.toString()
-    selectedProcessId.value = selectedProcessId.value === idStr ? null : idStr
-  }
 
   onMounted(() => {
     fetchData()
@@ -73,7 +92,7 @@
     <h2>Processos</h2>
     <div class="container">
       <!-- Lista à esquerda -->
-      <ul class="process-list">
+      <ul class="process-list" v-if="data && data.processes">
         <li 
           v-for="proc in data.processes" 
           :key="proc.id" 
@@ -84,46 +103,57 @@
         </li>
       </ul>
 
-    <div class="process-details" v-if="selectedProcessId !== null">
-      <h3>Detalhes do Processo</h3>
-      <div 
-        v-for="proc in data.processes" 
-        :key="'details-' + proc.id" 
-        v-show="proc.id.toString() === selectedProcessId"
-      >
-      <p><strong>Priority Base:</strong> {{ proc.priorityBase }}</p>
-      <p><strong>Priority Class:</strong> {{ proc.priorityClass }}</p>
-      <p><strong>Usuário:</strong> {{ proc.userName }}</p>
-      <p><strong>Memória Working Set:</strong> {{ (proc.memoryWorkingSet / 1024).toFixed(2) }} MB</p>
-      <p><strong>Memória Committed:</strong> {{ (proc.memoryCommitted / 1024).toFixed(2) }} MB</p>
-      <p><strong>Memória Privada Committed:</strong> {{ (proc.privateMemoryCommitted / 1024).toFixed(2) }} MB</p>
-      <p><strong>Memória Reservada:</strong> {{ (proc.memoryReserved / 1024).toFixed(2) }} MB</p>
-      <p><strong>Memória Heap:</strong> {{ (proc.memoryHeap / 1024).toFixed(2) }} MB</p>
-      <p><strong>Memória Stack:</strong> {{ (proc.memoryStack / 1024).toFixed(2) }} MB</p>
-      <p><strong>Memória Code:</strong> {{ (proc.memoryCode / 1024).toFixed(2) }} MB</p>
-      <p><strong>Número de Páginas:</strong> {{ proc.numberOfPages }}</p>
-        <h4 style="margin-top: 1rem;">Threads: {{ proc.threadCount }} </h4>
-        <ul class="thread-list">
-          <li
-            v-for="(thread, index) in proc.threads"
-            :key="'thread-' + thread.id"
-            @click="selectThread(index)"
-            :class="{ selected: selectedThreadIndex === index }"
-          >
-            Thread {{ thread.id }}
-          </li>
-        </ul>
+      <!-- Detalhes à direita -->
+      <div class="process-details" v-if="selectedProcessId !== null">
+        <h3>Detalhes do Processo</h3>
 
-        <div v-if="selectedThreadIndex !== null">
-          <h4>Detalhes da Thread</h4>
-          <div v-if="proc.threads[selectedThreadIndex]">
-            <p><strong>ID:</strong> {{ proc.threads[selectedThreadIndex].id }}</p>
-            <p><strong>Priority Base:</strong> {{ proc.threads[selectedThreadIndex].priorityBase }}</p>
-            <p><strong>Priority Delta:</strong> {{ proc.threads[selectedThreadIndex].priorityDelta }}</p>
+        <div v-if="selectedProcessData && !selectedProcessData.error">
+          <p><strong>Priority Base:</strong> {{ selectedProcessData.priorityBase }}</p>
+          <p><strong>Priority Class:</strong> {{ selectedProcessData.priorityClass }}</p>
+          <p><strong>Usuário:</strong> {{ selectedProcessData.userName }}</p>
+          <p><strong>Memória Working Set:</strong> {{ (selectedProcessData.memoryWorkingSet / 1024).toFixed(2) }} MB</p>
+          <p><strong>Memória Committed:</strong> {{ (selectedProcessData.memoryCommitted / 1024).toFixed(2) }} MB</p>
+          <p><strong>Memória Privada Committed:</strong> {{ (selectedProcessData.privateMemoryCommitted / 1024).toFixed(2) }} MB</p>
+          <p><strong>Memória Reservada:</strong> {{ (selectedProcessData.memoryReserved / 1024).toFixed(2) }} MB</p>
+          <p><strong>Memória Heap:</strong> {{ (selectedProcessData.memoryHeap / 1024).toFixed(2) }} MB</p>
+          <p><strong>Memória Stack:</strong> {{ (selectedProcessData.memoryStack / 1024).toFixed(2) }} MB</p>
+          <p><strong>Memória Code:</strong> {{ (selectedProcessData.memoryCode / 1024).toFixed(2) }} MB</p>
+          <p><strong>Número de Páginas:</strong> {{ selectedProcessData.numberOfPages }}</p>
+
+          <h4 style="margin-top: 1rem;">Threads: {{ selectedProcessData.threadCount }}</h4>
+          <ul class="thread-list">
+            <li
+              v-for="(thread, index) in selectedProcessData.threads"
+              :key="'thread-' + thread.id"
+              @click="selectThread(index)"
+              :class="{ selected: selectedThreadIndex === index }"
+            >
+              Thread {{ thread.id }}
+            </li>
+          </ul>
+
+          <div v-if="selectedThreadIndex !== null">
+            <h4>Detalhes da Thread</h4>
+            <div v-if="selectedProcessData.threads[selectedThreadIndex]">
+              <p><strong>ID:</strong> {{ selectedProcessData.threads[selectedThreadIndex].id }}</p>
+              <p><strong>Priority Base:</strong> {{ selectedProcessData.threads[selectedThreadIndex].priorityBase }}</p>
+              <p><strong>Priority Delta:</strong> {{ selectedProcessData.threads[selectedThreadIndex].priorityDelta }}</p>
+            </div>
           </div>
+
+          <h4 style="margin-top: 1rem;">Handles: {{ selectedProcessData.handles.length }}</h4>
+          <ul class="handle-list">
+            <li v-for="(handle, hIndex) in selectedProcessData.handles" :key="'handle-' + hIndex">
+              <strong>Tipo:</strong> {{ handle.type }}<br>
+              <strong>Nome:</strong> {{ handle.name || '(sem nome)' }}
+            </li>
+          </ul>
+        </div>
+
+        <div v-else>
+          <p>Carregando detalhes...</p>
         </div>
       </div>
-    </div>
     </div>
   </div>
 </template>
