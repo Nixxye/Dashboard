@@ -3,7 +3,7 @@
 Desenvolvido pelos alunos Jean Carlos do Nascimento Cunha e Murilo Motalvão Pereira para a disciplina de Sistemas Operacionais (CSO30), da UTPFR Curitiba, sob orientação do professor Marco Aurélio Wehrmeister.
 
 - Software de dashboard semelhante a um gerenciador de tarefas.
-- Desenvolvido em C++ utilizando a biblioteca **imgui** para a interface gráfica.
+- Desenvolvido em C++ utilizando a biblioteca **crow** para o back-end e vue-js para o front-end.
 - Utiliza diretamente a API do Windows para obter informações do sistema.
 
 ---
