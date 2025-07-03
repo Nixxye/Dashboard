@@ -391,7 +391,8 @@ namespace WindowsInfo {
         std::cout << "Carregando threads do processo " << id << std::endl;
         crow::json::wvalue threadsJson = crow::json::wvalue::list();
         int index = 0;
-        for ( auto& thread : getThreads()) {
+        std::list<Thread> threads = getThreads();
+        for ( auto& thread : threads) {
             threadsJson[index++] = thread.to_json();
         }
         j["threads"] = std::move(threadsJson);

@@ -148,7 +148,7 @@ function fetchProcessData() {
 }
 
 onMounted(() => {
-  intervalId = setInterval(fetchProcessData, 3000);
+//   intervalId = setInterval(fetchProcessData, 3000);
 });
 
 onUnmounted(() => {
