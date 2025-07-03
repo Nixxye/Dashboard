@@ -117,6 +117,7 @@ namespace WindowsInfo {
   crow::json::wvalue Model::get_process_json(int processId) {
       for (auto& process : processes) {
           if (process.id == static_cast<unsigned long>(processId)) {
+              std::cout << "Encontrado processo com ID: " << processId << std::endl;
               return process.to_json();
           }
       }

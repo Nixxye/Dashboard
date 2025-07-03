@@ -50,6 +50,7 @@
     selectedProcessData.value = null
 
     try {
+      console.log(`Enviando request para /process/${id}...`)
       const res = await fetch(`http://localhost:8000/process/${id}`)
       if (!res.ok) throw new Error(`Erro ao buscar detalhes do processo ${id}`)
       selectedProcessData.value = await res.json()

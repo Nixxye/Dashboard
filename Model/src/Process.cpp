@@ -220,7 +220,7 @@ namespace WindowsInfo {
         PULONG ReturnLength);
 
     void Process::loadHandles() {
-        // Limpa lista antiga
+        // Limpa listas antigas
         semaphores.clear();
         mutexes.clear();
         diskFiles.clear();
@@ -250,43 +250,42 @@ namespace WindowsInfo {
         std::vector<BYTE> buffer(bufferSize);
         ULONG returnLength = 0;
         NTSTATUS status;
+        const ULONG MAX_BUFFER_SIZE = 512 * 1024 * 1024; // 512 MB
 
-        // Tenta até buffer ser suficiente
-        while ((status = NtQuerySystemInformation(16 /*SystemHandleInformation*/, buffer.data(), bufferSize, &returnLength)) == STATUS_INFO_LENGTH_MISMATCH) {
+        while ((status = NtQuerySystemInformation(16, buffer.data(), bufferSize, &returnLength)) == STATUS_INFO_LENGTH_MISMATCH) {
+            if (bufferSize >= MAX_BUFFER_SIZE) {
+                std::cerr << "Buffer size exceeded safe limit, aborting.\n";
+                CloseHandle(hProcess);
+                return;
+            }
             bufferSize *= 2;
             buffer.resize(bufferSize);
         }
-        if (status != 0) { // sucesso é zero
+        if (status != 0) {
             CloseHandle(hProcess);
             return;
         }
 
         auto handleInfo = reinterpret_cast<SYSTEM_HANDLE_INFORMATION*>(buffer.data());
-        for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
+        const ULONG MAX_HANDLES = 10000;
+        for (ULONG i = 0; i < handleInfo->NumberOfHandles && i < MAX_HANDLES; ++i) {
             auto& h = handleInfo->Handles[i];
 
             if ((DWORD)h.UniqueProcessId != id)
-                continue; // Só handles do processo atual
+                continue;
 
-            // Duplicar handle para processo atual (se possível)
+            HANDLE sourceProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, h.UniqueProcessId);
+            if (!sourceProcess) continue;
+
             HANDLE dupHandle = nullptr;
-            if (DuplicateHandle(
-                OpenProcess(PROCESS_ALL_ACCESS, FALSE, h.UniqueProcessId),
-                (HANDLE)(uintptr_t)h.Handle,
-                GetCurrentProcess(),
-                &dupHandle,
-                0,
-                FALSE,
-                DUPLICATE_SAME_ACCESS)) 
-            {
-                // Cria objeto Handle com dupHandle
+            if (DuplicateHandle(sourceProcess, (HANDLE)(uintptr_t)h.Handle, GetCurrentProcess(), &dupHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
                 Handle handleObj(dupHandle);
+
                 if (handleObj.type == L"Mutant") {
                     mutexes.push_back(handleObj);
-                } else if (handleObj.type == L"Sempahore") {
+                } else if (handleObj.type == L"Semaphore") {
                     semaphores.push_back(handleObj);
                 } else if (handleObj.type == L"File") {
-                    // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletype
                     switch (GetFileType(handleObj.handleValue)) {
                         case FILE_TYPE_CHAR:
                             charFiles.push_back(handleObj);
@@ -296,24 +295,27 @@ namespace WindowsInfo {
                             break;
                         case FILE_TYPE_PIPE:
                             pipeFiles.push_back(handleObj);
-                            break;        
+                            break;
                         case FILE_TYPE_UNKNOWN:
                             unknownFiles.push_back(handleObj);
-                            break;    
+                            break;
                         default:
-                            break;                                          
+                            break;
                     }
                 } else if (handleObj.type == L"Directory") {
                     directories.push_back(handleObj);
                 } else if (handleObj.type == L"Device") {
                     devices.push_back(handleObj);
                 }
+
                 CloseHandle(dupHandle);
             }
+            CloseHandle(sourceProcess);
         }
 
         CloseHandle(hProcess);
     }
+
     crow::json::wvalue Process::to_json_simple() {
         crow::json::wvalue j;
         j["id"] = id;
@@ -330,7 +332,7 @@ namespace WindowsInfo {
         j["priorityBase"] = priorityBase;
         j["priorityClass"] = priorityClass;
         j["userName"] = userName;
-
+        std::cout << "Carregando informações de memória do processo " << id << std::endl;
         j["memoryWorkingSet"] = getMemoryWorkingSet();
         j["memoryCommitted"] = getMemoryCommitted();
         j["privateMemoryCommitted"] = getPrivateMemoryCommitted();
@@ -341,6 +343,7 @@ namespace WindowsInfo {
         j["numberOfPages"] = getNumberOfPages();
 
         // Serializa a lista de threads
+        std::cout << "Carregando threads do processo " << id << std::endl;
         crow::json::wvalue threadsJson = crow::json::wvalue::list();
         int index = 0;
         for ( auto& thread : getThreads()) {
@@ -348,7 +351,9 @@ namespace WindowsInfo {
         }
         j["threads"] = std::move(threadsJson);
         // Serializa a lista de handles
+        std::cout << "Carregando handles do processo " << id << std::endl;
         loadHandles();
+        std::cout << "Handles carregados: " << semaphores.size() + mutexes.size() + diskFiles.size() + charFiles.size() + pipeFiles.size() + unknownFiles.size() + directories.size() + devices.size() << std::endl;
         crow::json::wvalue semaphoresJson = crow::json::wvalue::list();
         index = 0;
         for (auto& handle : semaphores) {

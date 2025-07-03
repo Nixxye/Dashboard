@@ -38,7 +38,7 @@ namespace WindowsInfo {
 
         // Endpoint que retorna o JSON de um processo específico pelo ID
         CROW_ROUTE(app, "/process/<int>").methods(crow::HTTPMethod::Get)([this](int pid) {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::cout << "Requisição recebida para o processo ID: " << pid << std::endl;
             return model.get_process_json(pid);
         });
         app.port(8000).multithreaded().run();
