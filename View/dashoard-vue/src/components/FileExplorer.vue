@@ -38,6 +38,18 @@
                 getSortArrow("lastWriteTime")
               }}</span>
             </th>
+            <th @click="sortBy('lastAccessTime')">
+              Last Access
+              <span class="sort-arrow">{{
+                getSortArrow("lastAccessTime")
+              }}</span>
+            </th>
+            <th @click="sortBy('creationTime')">
+              Creation Time
+              <span class="sort-arrow">{{
+                getSortArrow("creationTime")
+              }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -63,6 +75,8 @@
               {{ item.type === "file" ? formatSize(item.fileSize) : "—" }}
             </td>
             <td>{{ formatDate(item.lastWriteTime) }}</td>
+            <td>{{ formatDate(item.creationTime) }}</td>
+            <td>{{ formatDate(item.lastAccessTime) }}</td>
           </tr>
         </tbody>
       </table>

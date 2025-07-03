@@ -368,7 +368,6 @@ namespace WindowsInfo
 
     if (INVALID_HANDLE_VALUE == hFind)
     {
-      std::cout << "deu merda" << std::endl;
       return true;
     }
 

@@ -53,7 +53,7 @@ async function fetchData() {
 
     try {
       console.log(`Enviando request para /process/${id}...`)
-      const res = await fetch(`http://localhost:8000/process/${id}`)
+      const res = await fetch(import.meta.env.VITE_API_BASE_URL + `/process/${id}`)
       if (!res.ok) throw new Error(`Erro ao buscar detalhes do processo ${id}`)
       selectedProcessData.value = await res.json()
     } catch (err: any) {

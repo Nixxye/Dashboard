@@ -137,7 +137,7 @@ const internalData = ref<any>(props.data); // cópia local
 let intervalId: number | null = null;
 
 function fetchProcessData() {
-  fetch(`http://localhost:8000/process/${props.processId}`)
+  fetch(import.meta.env.VITE_API_BASE_URL + `/process/${props.processId}`)
     .then(res => res.json())
     .then(json => {
       internalData.value = json;

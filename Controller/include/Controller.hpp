@@ -7,6 +7,8 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <fstream>
+#include <iostream>
 
 namespace WindowsInfo {
     class Controller {
@@ -16,6 +18,7 @@ namespace WindowsInfo {
 
         void initServer();
         void updatePipes();
+
 
     private:
         Model model;
@@ -27,5 +30,6 @@ namespace WindowsInfo {
         bool data_ready;
         std::thread server_thread;
         std::thread updater_thread;
+        std::pair<std::string, int> readConfig(std::string filename);
     };
 }
