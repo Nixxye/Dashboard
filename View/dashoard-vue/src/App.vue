@@ -1,9 +1,16 @@
-<script setup lang="ts">
-import Dashboard from './components/Dashboard.vue'
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <Dashboard/>
+  <header>
+    <nav>
+      <router-link to="/">Dashboard</router-link> |
+      <router-link to="/filesystem">Explorer</router-link>
+    </nav>
+  </header>
+
+  <main>
+    <router-view />
+  </main>
 </template>
 
 <style scoped>
