@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="close">
     <div class="modal-content">
       <button class="close-button" @click="close">×</button>
-      <h3>Detalhes do Processo</h3>
+      <h1>Detalhes do Processo</h1>
 
       <div v-if="data">
         <p><strong>Usuário:</strong> {{ data.userName }}</p>
@@ -29,125 +29,139 @@
           </li>
         </ul>
 
-        <div v-if="selectedThreadIndex !== null">
-          <h4>Detalhes da Thread</h4>
-          <div v-if="data.threads[selectedThreadIndex]">
-            <p><strong>ID:</strong> {{ data.threads[selectedThreadIndex].id }}</p>
-            <p><strong>Priority Base:</strong> {{ data.threads[selectedThreadIndex].priorityBase }}</p>
-            <p><strong>Priority Delta:</strong> {{ data.threads[selectedThreadIndex].priorityDelta }}</p>
-          </div>
-        </div>
-
         <!-- Semáforos -->
         <div v-if="data.semaphores && data.semaphores.length">
-        <h4>Semáforos: {{ data.semaphores.length }}</h4>
+          <h4>Semáforos: {{ data.semaphores.length }}</h4>
         </div>
 
         <!-- Mutexes -->
         <div v-if="data.mutexes && data.mutexes.length">
-        <h4>Mutexes: {{ data.mutexes.length }}</h4>
+          <h4>Mutexes: {{ data.mutexes.length }}</h4>
         </div>
 
         <!-- Arquivos em Disco -->
         <div v-if="data.diskFiles && data.diskFiles.length">
-        <h4>Arquivos em Disco: {{ data.diskFiles.length }}</h4>
-        <ul class="handle-list">
+          <h4>Arquivos em Disco: {{ data.diskFiles.length }}</h4>
+          <ul class="handle-list">
             <li v-for="(handle, index) in data.diskFiles" :key="'diskFile-' + index">
-            <template v-if="handle.name">{{ handle.name }}</template>
+              <template v-if="handle.name">{{ handle.name }}</template>
             </li>
-        </ul>
+          </ul>
         </div>
 
         <!-- Dispositivos de Caracteres -->
         <div v-if="data.charFiles && data.charFiles.length">
-        <h4>Dispositivos de Caracteres: {{ data.charFiles.length }}</h4>
-        <ul class="handle-list">
+          <h4>Dispositivos de Caracteres: {{ data.charFiles.length }}</h4>
+          <ul class="handle-list">
             <li v-for="(handle, index) in data.charFiles" :key="'charFile-' + index">
-            <template v-if="handle.name">{{ handle.name }}</template>
+              <template v-if="handle.name">{{ handle.name }}</template>
             </li>
-        </ul>
+          </ul>
         </div>
 
         <!-- Pipes -->
         <div v-if="data.pipeFiles && data.pipeFiles.length">
-        <h4>Pipes: {{ data.pipeFiles.length }}</h4>
-        <ul class="handle-list">
+          <h4>Pipes: {{ data.pipeFiles.length }}</h4>
+          <ul class="handle-list">
             <li v-for="(handle, index) in data.pipeFiles" :key="'pipeFile-' + index">
-            <template v-if="handle.name">{{ handle.name }}</template>
+              <template v-if="handle.name">{{ handle.name }}</template>
             </li>
-        </ul>
+          </ul>
         </div>
 
         <!-- Arquivos Desconhecidos -->
         <div v-if="data.unknownFiles && data.unknownFiles.length">
-        <h4>Arquivos Desconhecidos: {{ data.unknownFiles.length }}</h4>
-        <ul class="handle-list">
+          <h4>Arquivos Desconhecidos: {{ data.unknownFiles.length }}</h4>
+          <ul class="handle-list">
             <li v-for="(handle, index) in data.unknownFiles" :key="'unknownFile-' + index">
-            <template v-if="handle.name">{{ handle.name }}</template>
+              <template v-if="handle.name">{{ handle.name }}</template>
             </li>
-        </ul>
+          </ul>
         </div>
 
         <!-- Diretórios -->
         <div v-if="data.directories && data.directories.length">
-        <h4>Diretórios: {{ data.directories.length }}</h4>
-        <ul class="handle-list">
+          <h4>Diretórios: {{ data.directories.length }}</h4>
+          <ul class="handle-list">
             <li v-for="(handle, index) in data.directories" :key="'directory-' + index">
-            <template v-if="handle.name">{{ handle.name }}</template>
+              <template v-if="handle.name">{{ handle.name }}</template>
             </li>
-        </ul>
+          </ul>
         </div>
 
         <!-- Dispositivos -->
         <div v-if="data.devices && data.devices.length">
-        <h4>Dispositivos: {{ data.devices.length }}</h4>
-        <ul class="handle-list">
+          <h4>Dispositivos: {{ data.devices.length }}</h4>
+          <ul class="handle-list">
             <li v-for="(handle, index) in data.devices" :key="'device-' + index">
-            <template v-if="handle.name">{{ handle.name }}</template>
+              <template v-if="handle.name">{{ handle.name }}</template>
             </li>
-        </ul>
+          </ul>
         </div>
-    </div>
+      </div>
 
       <div v-else>
         <p>Carregando detalhes...</p>
+      </div>
+    </div>
+
+    <!-- Popup Thread -->
+    <div
+      v-if="showThreadPopup"
+      class="thread-popup-overlay"
+      @click.self="closeThreadPopup"
+    >
+      <div class="thread-popup-content">
+        <button class="close-button" @click="closeThreadPopup">×</button>
+        <h4>Thread {{ selectedThreadData?.id }}</h4>
+        <p><strong>Priority Base:</strong> {{ selectedThreadData?.priorityBase }}</p>
+        <p><strong>Priority Delta:</strong> {{ selectedThreadData?.priorityDelta }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from "vue";
 
 const props = defineProps<{
   data: any;
   selectedThreadIndex: number | null;
 }>();
-const emit = defineEmits(['close', 'select-thread']);
+const emit = defineEmits(["close", "select-thread"]);
+
+const showThreadPopup = ref(false);
+const selectedThreadData = ref<any>(null);
 
 function close() {
-  emit('close');
+  emit("close");
 }
 
 function selectThread(index: number) {
-  emit('select-thread', index);
+  emit("select-thread", index);
+  selectedThreadData.value = props.data.threads[index];
+  showThreadPopup.value = true;
+}
+
+function closeThreadPopup() {
+  showThreadPopup.value = false;
 }
 
 function format(memoryInKb: number) {
   return memoryInKb >= 1048576
-    ? (memoryInKb / 1048576).toFixed(2) + ' GB'
-    : (memoryInKb / 1024).toFixed(2) + ' MB';
+    ? (memoryInKb / 1048576).toFixed(2) + " GB"
+    : (memoryInKb / 1024).toFixed(2) + " MB";
 }
 
 const categories = [
-  { key: 'semaphores', label: 'Semáforos' },
-  { key: 'mutexes', label: 'Mutexes' },
-  { key: 'diskFiles', label: 'Arquivos em Disco' },
-  { key: 'charFiles', label: 'Dispositivos de Caracteres' },
-  { key: 'pipeFiles', label: 'Pipes' },
-  { key: 'unknownFiles', label: 'Arquivos Desconhecidos' },
-  { key: 'directories', label: 'Diretórios' },
-  { key: 'devices', label: 'Dispositivos' },
+  { key: "semaphores", label: "Semáforos" },
+  { key: "mutexes", label: "Mutexes" },
+  { key: "diskFiles", label: "Arquivos em Disco" },
+  { key: "charFiles", label: "Dispositivos de Caracteres" },
+  { key: "pipeFiles", label: "Pipes" },
+  { key: "unknownFiles", label: "Arquivos Desconhecidos" },
+  { key: "directories", label: "Diretórios" },
+  { key: "devices", label: "Dispositivos" },
 ];
 </script>
 
@@ -171,7 +185,7 @@ const categories = [
   border-radius: 8px;
   max-height: 90vh;
   overflow-y: auto;
-  width: 800px;
+  width: 60vw;
   position: relative;
 }
 
@@ -185,8 +199,43 @@ const categories = [
   cursor: pointer;
 }
 
-.thread-list li.selected {
-  font-weight: bold;
-  background-color: #ddd;
+.thread-list li:hover {
+  background-color: #5555aa;
+  cursor: pointer;
+}
+
+
+ul.handle-list,
+ul.thread-list {
+  list-style-type: none;
+  padding-left: 0;
+  text-align: center;
+  margin: 0 auto;
+  width: fit-content;
+}
+
+/* Popup thread */
+
+.thread-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.thread-popup-content {
+  background: #2c2c2c;
+  padding: 1.5rem;
+  border-radius: 8px;
+  width: 300px;
+  color: white;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
 }
 </style>

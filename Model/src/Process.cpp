@@ -220,7 +220,6 @@ namespace WindowsInfo {
         PULONG ReturnLength);
 
     void Process::loadHandles() {
-        // Limpa listas antigas
         semaphores.clear();
         mutexes.clear();
         diskFiles.clear();
@@ -232,16 +231,21 @@ namespace WindowsInfo {
 
         // Abre handle do processo para duplicar handles
         HANDLE hProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, id);
-        if (!hProcess) return;
+        if (!hProcess) {
+            std::cerr << "OpenProcess (PROCESS_DUP_HANDLE) failed for PID " << id << ": " << GetLastError() << std::endl;
+            return;
+        }
 
         // Pega ponteiro para NtQuerySystemInformation
         HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
         if (!hNtdll) {
+            std::cerr << "GetModuleHandleW failed for ntdll.dll: " << GetLastError() << std::endl;
             CloseHandle(hProcess);
             return;
         }
         auto NtQuerySystemInformation = (NtQuerySystemInformation_t)GetProcAddress(hNtdll, "NtQuerySystemInformation");
         if (!NtQuerySystemInformation) {
+            std::cerr << "GetProcAddress failed for NtQuerySystemInformation: " << GetLastError() << std::endl;
             CloseHandle(hProcess);
             return;
         }
@@ -254,39 +258,71 @@ namespace WindowsInfo {
 
         while ((status = NtQuerySystemInformation(16, buffer.data(), bufferSize, &returnLength)) == STATUS_INFO_LENGTH_MISMATCH) {
             if (bufferSize >= MAX_BUFFER_SIZE) {
-                std::cerr << "Buffer size exceeded safe limit, aborting.\n";
+                std::cerr << "Buffer size exceeded safe limit (" << MAX_BUFFER_SIZE / (1024 * 1024) << " MB), aborting.\n";
                 CloseHandle(hProcess);
                 return;
             }
             bufferSize *= 2;
             buffer.resize(bufferSize);
+            std::cerr << "Resizing buffer to " << bufferSize / 1024 << " KB." << std::endl;
         }
+
         if (status != 0) {
+            std::cerr << "NtQuerySystemInformation failed with status: 0x" << std::hex << status << std::dec << std::endl;
             CloseHandle(hProcess);
             return;
         }
 
         auto handleInfo = reinterpret_cast<SYSTEM_HANDLE_INFORMATION*>(buffer.data());
-        const ULONG MAX_HANDLES = 10000;
-        for (ULONG i = 0; i < handleInfo->NumberOfHandles && i < MAX_HANDLES; ++i) {
+        std::cout << "Total system handles enumerated: " << handleInfo->NumberOfHandles << std::endl;
+
+        const ULONG MAX_HANDLES_TO_PROCESS = 100000; // Increased limit for testing
+        ULONG processedHandles = 0;
+
+        for (ULONG i = 0; i < handleInfo->NumberOfHandles && i < MAX_HANDLES_TO_PROCESS; ++i) {
             auto& h = handleInfo->Handles[i];
 
-            if ((DWORD)h.UniqueProcessId != id)
-                continue;
+            if ((DWORD)h.UniqueProcessId != id) {
+                continue; // Not a handle for our target process
+            }
+            processedHandles++;
 
-            HANDLE sourceProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, h.UniqueProcessId);
-            if (!sourceProcess) continue;
+            // Open the source process to duplicate the handle
+            // Using PROCESS_DUP_HANDLE is generally sufficient here, PROCESS_ALL_ACCESS is often overkill and prone to fail
+            HANDLE sourceProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, h.UniqueProcessId);
+            if (!sourceProcess) {
+                // std::cerr << "OpenProcess (PROCESS_DUP_HANDLE) failed for source PID " << h.UniqueProcessId
+                //           << " (handle 0x" << std::hex << h.Handle << std::dec << "): " << GetLastError() << std::endl;
+                // This is common for protected processes, so often not an error to report unless debugging specific cases
+                continue;
+            }
 
             HANDLE dupHandle = nullptr;
+            // DUPLICATE_SAME_ACCESS is usually what you want here.
+            // If you need specific access rights for NtQueryObject later, you might need to request them.
             if (DuplicateHandle(sourceProcess, (HANDLE)(uintptr_t)h.Handle, GetCurrentProcess(), &dupHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
-                Handle handleObj(dupHandle);
+                Handle handleObj(dupHandle); // Assuming Handle constructor gets type and name
+                
+                // Add a check for whether handleObj.type is actually populated
+                if (handleObj.type.empty()) {
+                    std::cerr << "Handle object type is empty for duplicated handle 0x" << std::hex << dupHandle
+                            << " from PID " << h.UniqueProcessId << ", original handle 0x" << h.Handle << std::dec << std::endl;
+                    CloseHandle(dupHandle);
+                    CloseHandle(sourceProcess);
+                    continue;
+                }
 
                 if (handleObj.type == L"Mutant") {
                     mutexes.push_back(handleObj);
                 } else if (handleObj.type == L"Semaphore") {
                     semaphores.push_back(handleObj);
                 } else if (handleObj.type == L"File") {
-                    switch (GetFileType(handleObj.handleValue)) {
+                    DWORD fileType = GetFileType(handleObj.handleValue);
+                    if (fileType == FILE_TYPE_UNKNOWN && GetLastError() != NO_ERROR) {
+                        std::cerr << "GetFileType failed for File handle 0x" << std::hex << handleObj.handleValue
+                                << ": " << GetLastError() << std::dec << std::endl;
+                    }
+                    switch (fileType) {
                         case FILE_TYPE_CHAR:
                             charFiles.push_back(handleObj);
                             break;
@@ -306,13 +342,19 @@ namespace WindowsInfo {
                     directories.push_back(handleObj);
                 } else if (handleObj.type == L"Device") {
                     devices.push_back(handleObj);
+                } else {
+                    // Log unhandled types if necessary
+                    // std::cout << "Unhandled handle type: " << std::string(handleObj.type.begin(), handleObj.type.end()) << std::endl;
                 }
 
                 CloseHandle(dupHandle);
+            } else {
+                std::cerr << "DuplicateHandle failed for PID " << h.UniqueProcessId << ", original handle 0x" << std::hex << h.Handle
+                        << std::dec << " (Error: " << GetLastError() << ")." << std::endl;
             }
             CloseHandle(sourceProcess);
         }
-
+        std::cout << "Processed " << processedHandles << " handles for PID " << id << std::endl;
         CloseHandle(hProcess);
     }
 

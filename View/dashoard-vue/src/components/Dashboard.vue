@@ -106,7 +106,6 @@ function formatMemory(memoryInKb: number) {
 
     <h2>Processos</h2>
     <div class="container">
-      <!-- Lista à esquerda -->
       <ul class="process-list" v-if="data && data.processes">
         <li 
           v-for="proc in data.processes" 
@@ -132,8 +131,10 @@ function formatMemory(memoryInKb: number) {
 <style scoped>
 .container {
   display: flex;
-  gap: 2rem;
+  justify-content: center; /* centraliza horizontalmente */
   align-items: flex-start;
+  gap: 2rem;
+  flex-wrap: wrap; /* permite que quebre se faltar espaço */
 }
 
 .process-list {
