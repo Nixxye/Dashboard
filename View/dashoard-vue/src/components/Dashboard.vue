@@ -120,10 +120,12 @@ function formatMemory(memoryInKb: number) {
       <ProcessModal
         v-if="selectedProcessData"
         :data="selectedProcessData"
+        :processId="selectedProcessId"
         :selectedThreadIndex="selectedThreadIndex"
         @close="selectedProcessData = null"
         @select-thread="selectThread"
       />
+
     </div>
   </div>
 </template>

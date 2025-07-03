@@ -2,25 +2,25 @@
   <div class="modal-overlay" @click.self="close">
     <div class="modal-content">
       <button class="close-button" @click="close">×</button>
-      <h1>Detalhes do Processo</h1>
+      <h1> {{internalData.name}}</h1>
 
-      <div v-if="data">
-        <p><strong>Usuário:</strong> {{ data.userName }}</p>
-        <p><strong>Priority Base:</strong> {{ data.priorityBase }}</p>
-        <p><strong>Priority Class:</strong> {{ data.priorityClass }}</p>
-        <p><strong>Memória Working Set:</strong> {{ format(data.memoryWorkingSet) }}</p>
-        <p><strong>Memória Committed:</strong> {{ format(data.memoryCommitted) }}</p>
-        <p><strong>Memória Privada Committed:</strong> {{ format(data.privateMemoryCommitted) }}</p>
-        <p><strong>Memória Reservada:</strong> {{ format(data.memoryReserved) }}</p>
-        <p><strong>Memória Heap:</strong> {{ format(data.memoryHeap) }}</p>
-        <p><strong>Memória Stack:</strong> {{ format(data.memoryStack) }}</p>
-        <p><strong>Memória Code:</strong> {{ format(data.memoryCode) }}</p>
-        <p><strong>Número de Páginas:</strong> {{ data.numberOfPages }}</p>
+      <div v-if="internalData">
+        <p><strong>Usuário:</strong> {{ internalData.userName }}</p>
+        <p><strong>Priority Base:</strong> {{ internalData.priorityBase }}</p>
+        <p><strong>Priority Class:</strong> {{ internalData.priorityClass }}</p>
+        <p><strong>Memória Working Set:</strong> {{ format(internalData.memoryWorkingSet) }}</p>
+        <p><strong>Memória Committed:</strong> {{ format(internalData.memoryCommitted) }}</p>
+        <p><strong>Memória Privada Committed:</strong> {{ format(internalData.privateMemoryCommitted) }}</p>
+        <p><strong>Memória Reservada:</strong> {{ format(internalData.memoryReserved) }}</p>
+        <p><strong>Memória Heap:</strong> {{ format(internalData.memoryHeap) }}</p>
+        <p><strong>Memória Stack:</strong> {{ format(internalData.memoryStack) }}</p>
+        <p><strong>Memória Code:</strong> {{ format(internalData.memoryCode) }}</p>
+        <p><strong>Número de Páginas:</strong> {{ internalData.numberOfPages }}</p>
 
-        <h4>Threads: {{ data.threadCount }}</h4>
+        <h4>Threads: {{ internalData.threadCount }}</h4>
         <ul class="thread-list">
           <li
-            v-for="(thread, index) in data.threads"
+            v-for="(thread, index) in internalData.threads"
             :key="'thread-' + thread.id"
             @click="selectThread(index)"
             :class="{ selected: selectedThreadIndex === index }"
@@ -30,70 +30,70 @@
         </ul>
 
         <!-- Semáforos -->
-        <div v-if="data.semaphores && data.semaphores.length">
-          <h4>Semáforos: {{ data.semaphores.length }}</h4>
+        <div v-if="internalData.semaphores && internalData.semaphores.length">
+          <h4>Semáforos: {{ internalData.semaphores.length }}</h4>
         </div>
 
         <!-- Mutexes -->
-        <div v-if="data.mutexes && data.mutexes.length">
-          <h4>Mutexes: {{ data.mutexes.length }}</h4>
+        <div v-if="internalData.mutexes && internalData.mutexes.length">
+          <h4>Mutexes: {{ internalData.mutexes.length }}</h4>
         </div>
 
         <!-- Arquivos em Disco -->
-        <div v-if="data.diskFiles && data.diskFiles.length">
-          <h4>Arquivos em Disco: {{ data.diskFiles.length }}</h4>
+        <div v-if="internalData.diskFiles && internalData.diskFiles.length">
+          <h4>Arquivos em Disco: {{ internalData.diskFiles.length }}</h4>
           <ul class="handle-list">
-            <li v-for="(handle, index) in data.diskFiles" :key="'diskFile-' + index">
+            <li v-for="(handle, index) in internalData.diskFiles" :key="'diskFile-' + index">
               <template v-if="handle.name">{{ handle.name }}</template>
             </li>
           </ul>
         </div>
 
         <!-- Dispositivos de Caracteres -->
-        <div v-if="data.charFiles && data.charFiles.length">
-          <h4>Dispositivos de Caracteres: {{ data.charFiles.length }}</h4>
+        <div v-if="internalData.charFiles && internalData.charFiles.length">
+          <h4>Dispositivos de Caracteres: {{ internalData.charFiles.length }}</h4>
           <ul class="handle-list">
-            <li v-for="(handle, index) in data.charFiles" :key="'charFile-' + index">
+            <li v-for="(handle, index) in internalData.charFiles" :key="'charFile-' + index">
               <template v-if="handle.name">{{ handle.name }}</template>
             </li>
           </ul>
         </div>
 
         <!-- Pipes -->
-        <div v-if="data.pipeFiles && data.pipeFiles.length">
-          <h4>Pipes: {{ data.pipeFiles.length }}</h4>
+        <div v-if="internalData.pipeFiles && internalData.pipeFiles.length">
+          <h4>Pipes: {{ internalData.pipeFiles.length }}</h4>
           <ul class="handle-list">
-            <li v-for="(handle, index) in data.pipeFiles" :key="'pipeFile-' + index">
+            <li v-for="(handle, index) in internalData.pipeFiles" :key="'pipeFile-' + index">
               <template v-if="handle.name">{{ handle.name }}</template>
             </li>
           </ul>
         </div>
 
         <!-- Arquivos Desconhecidos -->
-        <div v-if="data.unknownFiles && data.unknownFiles.length">
-          <h4>Arquivos Desconhecidos: {{ data.unknownFiles.length }}</h4>
+        <div v-if="internalData.unknownFiles && internalData.unknownFiles.length">
+          <h4>Arquivos Desconhecidos: {{ internalData.unknownFiles.length }}</h4>
           <ul class="handle-list">
-            <li v-for="(handle, index) in data.unknownFiles" :key="'unknownFile-' + index">
+            <li v-for="(handle, index) in internalData.unknownFiles" :key="'unknownFile-' + index">
               <template v-if="handle.name">{{ handle.name }}</template>
             </li>
           </ul>
         </div>
 
         <!-- Diretórios -->
-        <div v-if="data.directories && data.directories.length">
-          <h4>Diretórios: {{ data.directories.length }}</h4>
+        <div v-if="internalData.directories && internalData.directories.length">
+          <h4>Diretórios: {{ internalData.directories.length }}</h4>
           <ul class="handle-list">
-            <li v-for="(handle, index) in data.directories" :key="'directory-' + index">
+            <li v-for="(handle, index) in internalData.directories" :key="'directory-' + index">
               <template v-if="handle.name">{{ handle.name }}</template>
             </li>
           </ul>
         </div>
 
         <!-- Dispositivos -->
-        <div v-if="data.devices && data.devices.length">
-          <h4>Dispositivos: {{ data.devices.length }}</h4>
+        <div v-if="internalData.devices && internalData.devices.length">
+          <h4>Dispositivos: {{ internalData.devices.length }}</h4>
           <ul class="handle-list">
-            <li v-for="(handle, index) in data.devices" :key="'device-' + index">
+            <li v-for="(handle, index) in internalData.devices" :key="'device-' + index">
               <template v-if="handle.name">{{ handle.name }}</template>
             </li>
           </ul>
@@ -122,16 +122,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 
 const props = defineProps<{
   data: any;
   selectedThreadIndex: number | null;
+  processId: string;
 }>();
 const emit = defineEmits(["close", "select-thread"]);
 
 const showThreadPopup = ref(false);
 const selectedThreadData = ref<any>(null);
+const internalData = ref<any>(props.data); // cópia local
+let intervalId: number | null = null;
+
+function fetchProcessData() {
+  fetch(`http://localhost:8000/process/${props.processId}`)
+    .then(res => res.json())
+    .then(json => {
+      internalData.value = json;
+    })
+    .catch(err => {
+      console.error("Erro ao atualizar processo:", err);
+    });
+}
+
+onMounted(() => {
+  intervalId = setInterval(fetchProcessData, 3000);
+});
+
+onUnmounted(() => {
+  if (intervalId) clearInterval(intervalId);
+});
 
 function close() {
   emit("close");
