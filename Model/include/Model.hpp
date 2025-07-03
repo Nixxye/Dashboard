@@ -41,6 +41,7 @@ namespace WindowsInfo
         WindowsInfo::System getSystemInfo();
         int getThreadCount();
         void updateProcesses();
+        crow::json::wvalue get_process_json(int processId);
         crow::json::wvalue to_json();
         std::vector<FileSystemInfo::VolumeInfo> GetVolumesInfo();
         int GetVolumeInfo(FileSystemInfo::VolumeInfo &volumeInfo);

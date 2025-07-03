@@ -79,6 +79,11 @@ namespace WindowsInfo
         // HTTP 400 Bad Request é o código apropriado para uma requisição malformada.
         return crow::response(400, "Erro: O parâmetro 'term' é obrigatório na query string."); });
 
+        // Endpoint que retorna o JSON de um processo específico pelo ID
+        CROW_ROUTE(app, "/process/<int>").methods(crow::HTTPMethod::Get)([this](int pid)
+                                                                         {
+            std::cout << "Requisição recebida para o processo ID: " << pid << std::endl;
+            return model.get_process_json(pid); });
         app.bindaddr("0.0.0.0").port(8000).multithreaded().run();
     }
 
@@ -97,5 +102,4 @@ namespace WindowsInfo
             cv.notify_all();
         }
     }
-
 }

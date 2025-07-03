@@ -10,11 +10,21 @@
 #include <iostream>
 
 #include "../include/Thread.hpp"
+#include "../include/Handle.hpp"
 
 namespace WindowsInfo {
     class Process {
     private:
         std::list<Thread> threads;
+        std::list<Handle> semaphores;
+        std::list<Handle> mutexes;
+        std::list<Handle> diskFiles;
+        std::list<Handle> charFiles;
+        std::list<Handle> pipeFiles;
+        std::list<Handle> unknownFiles;
+        
+        std::list<Handle> directories;
+        std::list<Handle> devices;
         std::string userName;
         unsigned int threadCount;
         unsigned int priorityBase;
@@ -42,7 +52,9 @@ namespace WindowsInfo {
         unsigned int getPriorityClass();
         unsigned int getThreadCount();
         std::string getUserName();
+        void loadHandles();
         crow::json::wvalue to_json();
+        crow::json::wvalue to_json_simple();
         unsigned long long getMemoryWorkingSet() {
             if (memoryWorkingSet == 0) loadMemoryInfo();
             return memoryWorkingSet;

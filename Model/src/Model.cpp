@@ -63,7 +63,11 @@ std::string wchar_to_string(const wchar_t *wcharStr)
 namespace WindowsInfo
 {
 
-  Model::Model() : processes(), systemInfo() { updateProcesses(); }
+  Model::Model() : processes(), systemInfo()
+  {
+    std::cout << "Criando model" << std::endl;
+    updateProcesses();
+  }
 
   Model::~Model() { processes.clear(); }
 
@@ -72,7 +76,6 @@ namespace WindowsInfo
     updateProcesses();
     return processes;
   }
-
   WindowsInfo::System Model::getSystemInfo() { return systemInfo; }
   int Model::getThreadCount()
   {
@@ -92,7 +95,6 @@ namespace WindowsInfo
     HANDLE hProcess;
     PROCESSENTRY32 pe32;
     DWORD dwPriorityClass;
-
     // Captura todos os processos em execução
     hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hProcessSnap == INVALID_HANDLE_VALUE)
@@ -149,7 +151,7 @@ namespace WindowsInfo
     int index = 0;
     for (auto &process : getProcesses())
     {
-      processesJson[index++] = process.to_json();
+      processesJson[index++] = process.to_json_simple();
     }
     j["processes"] = std::move(processesJson);
 
@@ -161,8 +163,25 @@ namespace WindowsInfo
 
     return j;
   }
+  crow::json::wvalue Model::get_process_json(int processId)
+  {
+    for (auto &process : processes)
+    {
+      if (process.id == static_cast<unsigned long>(processId))
+      {
+        std::cout << "Encontrado processo com ID: " << processId << std::endl;
+        return process.to_json();
+      }
+    }
 
-  void GetDiskUsage(FileSystemInfo::VolumeInfo& volumeInfo)
+    // Caso o processo não seja encontrado
+    crow::json::wvalue notFound;
+    notFound["error"] = "Processo não encontrado";
+    notFound["id"] = processId;
+    return notFound;
+  }
+
+  void GetDiskUsage(FileSystemInfo::VolumeInfo &volumeInfo)
   {
     ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
     const wchar_t *widecstr = std::wstring(volumeInfo.Path.begin(), volumeInfo.Path.end()).c_str();

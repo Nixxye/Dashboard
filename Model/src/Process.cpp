@@ -7,9 +7,11 @@
 #include <tchar.h>
 #include <tlhelp32.h>
 #include <winnt.h>
-
-
 #include "../include/Process.hpp"
+
+#ifndef STATUS_INFO_LENGTH_MISMATCH
+#define STATUS_INFO_LENGTH_MISMATCH ((NTSTATUS)0xC0000004)
+#endif
 
 constexpr size_t PAGE_SIZE = 4096;
 
@@ -90,6 +92,7 @@ namespace WindowsInfo {
             CloseHandle(hToken);
             CloseHandle( hProcess );
         }
+        // loadHandles();
     }
     //https://learn.microsoft.com/en-us/windows/win32/toolhelp/traversing-the-thread-list
     std::list<Thread> Process::getThreads() {
@@ -195,6 +198,131 @@ namespace WindowsInfo {
       this->memoryStack = stackSize / 1024;
       this->memoryCode = codeSize / 1024;
     }
+    struct SYSTEM_HANDLE_TABLE_ENTRY_INFO {
+        USHORT UniqueProcessId;
+        USHORT CreatorBackTraceIndex;
+        BYTE ObjectTypeNumber;
+        BYTE Flags;
+        USHORT Handle;
+        PVOID Object;
+        ACCESS_MASK GrantedAccess;
+    };
+
+    struct SYSTEM_HANDLE_INFORMATION {
+        ULONG NumberOfHandles;
+        SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
+    };
+
+    using NtQuerySystemInformation_t = NTSTATUS(WINAPI*)(
+        ULONG SystemInformationClass,
+        PVOID SystemInformation,
+        ULONG SystemInformationLength,
+        PULONG ReturnLength);
+
+    void Process::loadHandles() {
+        // Limpa listas antigas
+        semaphores.clear();
+        mutexes.clear();
+        diskFiles.clear();
+        charFiles.clear();
+        pipeFiles.clear();
+        unknownFiles.clear();
+        directories.clear();
+        devices.clear();
+
+        // Abre handle do processo para duplicar handles
+        HANDLE hProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, id);
+        if (!hProcess) return;
+
+        // Pega ponteiro para NtQuerySystemInformation
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (!hNtdll) {
+            CloseHandle(hProcess);
+            return;
+        }
+        auto NtQuerySystemInformation = (NtQuerySystemInformation_t)GetProcAddress(hNtdll, "NtQuerySystemInformation");
+        if (!NtQuerySystemInformation) {
+            CloseHandle(hProcess);
+            return;
+        }
+
+        ULONG bufferSize = 0x10000;
+        std::vector<BYTE> buffer(bufferSize);
+        ULONG returnLength = 0;
+        NTSTATUS status;
+        const ULONG MAX_BUFFER_SIZE = 512 * 1024 * 1024; // 512 MB
+
+        while ((status = NtQuerySystemInformation(16, buffer.data(), bufferSize, &returnLength)) == STATUS_INFO_LENGTH_MISMATCH) {
+            if (bufferSize >= MAX_BUFFER_SIZE) {
+                std::cerr << "Buffer size exceeded safe limit, aborting.\n";
+                CloseHandle(hProcess);
+                return;
+            }
+            bufferSize *= 2;
+            buffer.resize(bufferSize);
+        }
+        if (status != 0) {
+            CloseHandle(hProcess);
+            return;
+        }
+
+        auto handleInfo = reinterpret_cast<SYSTEM_HANDLE_INFORMATION*>(buffer.data());
+        const ULONG MAX_HANDLES = 10000;
+        for (ULONG i = 0; i < handleInfo->NumberOfHandles && i < MAX_HANDLES; ++i) {
+            auto& h = handleInfo->Handles[i];
+
+            if ((DWORD)h.UniqueProcessId != id)
+                continue;
+
+            HANDLE sourceProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, h.UniqueProcessId);
+            if (!sourceProcess) continue;
+
+            HANDLE dupHandle = nullptr;
+            if (DuplicateHandle(sourceProcess, (HANDLE)(uintptr_t)h.Handle, GetCurrentProcess(), &dupHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+                Handle handleObj(dupHandle);
+
+                if (handleObj.type == L"Mutant") {
+                    mutexes.push_back(handleObj);
+                } else if (handleObj.type == L"Semaphore") {
+                    semaphores.push_back(handleObj);
+                } else if (handleObj.type == L"File") {
+                    switch (GetFileType(handleObj.handleValue)) {
+                        case FILE_TYPE_CHAR:
+                            charFiles.push_back(handleObj);
+                            break;
+                        case FILE_TYPE_DISK:
+                            diskFiles.push_back(handleObj);
+                            break;
+                        case FILE_TYPE_PIPE:
+                            pipeFiles.push_back(handleObj);
+                            break;
+                        case FILE_TYPE_UNKNOWN:
+                            unknownFiles.push_back(handleObj);
+                            break;
+                        default:
+                            break;
+                    }
+                } else if (handleObj.type == L"Directory") {
+                    directories.push_back(handleObj);
+                } else if (handleObj.type == L"Device") {
+                    devices.push_back(handleObj);
+                }
+
+                CloseHandle(dupHandle);
+            }
+            CloseHandle(sourceProcess);
+        }
+
+        CloseHandle(hProcess);
+    }
+
+    crow::json::wvalue Process::to_json_simple() {
+        crow::json::wvalue j;
+        j["id"] = id;
+        j["parentId"] = parentId;
+        j["name"] = name;
+        return j;
+    }
     crow::json::wvalue Process::to_json() {
         crow::json::wvalue j;
         j["id"] = id;
@@ -204,7 +332,7 @@ namespace WindowsInfo {
         j["priorityBase"] = priorityBase;
         j["priorityClass"] = priorityClass;
         j["userName"] = userName;
-
+        std::cout << "Carregando informações de memória do processo " << id << std::endl;
         j["memoryWorkingSet"] = getMemoryWorkingSet();
         j["memoryCommitted"] = getMemoryCommitted();
         j["privateMemoryCommitted"] = getPrivateMemoryCommitted();
@@ -215,13 +343,72 @@ namespace WindowsInfo {
         j["numberOfPages"] = getNumberOfPages();
 
         // Serializa a lista de threads
+        std::cout << "Carregando threads do processo " << id << std::endl;
         crow::json::wvalue threadsJson = crow::json::wvalue::list();
         int index = 0;
         for ( auto& thread : getThreads()) {
             threadsJson[index++] = thread.to_json();
         }
         j["threads"] = std::move(threadsJson);
+        // Serializa a lista de handles
+        std::cout << "Carregando handles do processo " << id << std::endl;
+        loadHandles();
+        std::cout << "Handles carregados: " << semaphores.size() + mutexes.size() + diskFiles.size() + charFiles.size() + pipeFiles.size() + unknownFiles.size() + directories.size() + devices.size() << std::endl;
+        crow::json::wvalue semaphoresJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : semaphores) {
+            semaphoresJson[index++] = handle.to_json();
+        }
+        j["semaphores"] = std::move(semaphoresJson);
 
+        crow::json::wvalue mutexesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : mutexes) {
+            mutexesJson[index++] = handle.to_json();
+        }
+        j["mutexes"] = std::move(mutexesJson);
+
+        crow::json::wvalue diskFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : diskFiles) {
+            diskFilesJson[index++] = handle.to_json();
+        }
+        j["diskFiles"] = std::move(diskFilesJson);
+
+        crow::json::wvalue charFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : charFiles) {
+            charFilesJson[index++] = handle.to_json();
+        }
+        j["charFiles"] = std::move(charFilesJson);
+
+        crow::json::wvalue pipeFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : pipeFiles) {
+            pipeFilesJson[index++] = handle.to_json();
+        }
+        j["pipeFiles"] = std::move(pipeFilesJson);
+
+        crow::json::wvalue unknownFilesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : unknownFiles) {
+            unknownFilesJson[index++] = handle.to_json();
+        }
+        j["unknownFiles"] = std::move(unknownFilesJson);
+
+        crow::json::wvalue directoriesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : directories) {
+            directoriesJson[index++] = handle.to_json();
+        }
+        j["directories"] = std::move(directoriesJson);
+
+        crow::json::wvalue devicesJson = crow::json::wvalue::list();
+        index = 0;
+        for (auto& handle : devices) {
+            devicesJson[index++] = handle.to_json();
+        }
+        j["devices"] = std::move(devicesJson);
         return j;
     }
 } // namespace WindowsInfo
