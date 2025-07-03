@@ -210,7 +210,7 @@ namespace WindowsInfo {
 
     struct SYSTEM_HANDLE_INFORMATION {
         ULONG NumberOfHandles;
-        SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
+        SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1]; 
     };
 
     using NtQuerySystemInformation_t = NTSTATUS(WINAPI*)(
@@ -276,37 +276,30 @@ namespace WindowsInfo {
         auto handleInfo = reinterpret_cast<SYSTEM_HANDLE_INFORMATION*>(buffer.data());
         std::cout << "Total system handles enumerated: " << handleInfo->NumberOfHandles << std::endl;
 
-        const ULONG MAX_HANDLES_TO_PROCESS = 100000; // Increased limit for testing
+        const ULONG MAX_HANDLES_TO_PROCESS = 100000;
         ULONG processedHandles = 0;
 
         for (ULONG i = 0; i < handleInfo->NumberOfHandles && i < MAX_HANDLES_TO_PROCESS; ++i) {
             auto& h = handleInfo->Handles[i];
-
+            // Verifica se o handle pertence ao processo atual
             if ((DWORD)h.UniqueProcessId != id) {
-                continue; // Not a handle for our target process
+                continue; 
             }
             processedHandles++;
 
-            // Open the source process to duplicate the handle
-            // Using PROCESS_DUP_HANDLE is generally sufficient here, PROCESS_ALL_ACCESS is often overkill and prone to fail
             HANDLE sourceProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, h.UniqueProcessId);
             if (!sourceProcess) {
-                // std::cerr << "OpenProcess (PROCESS_DUP_HANDLE) failed for source PID " << h.UniqueProcessId
-                //           << " (handle 0x" << std::hex << h.Handle << std::dec << "): " << GetLastError() << std::endl;
-                // This is common for protected processes, so often not an error to report unless debugging specific cases
+
                 continue;
             }
 
             HANDLE dupHandle = nullptr;
-            // DUPLICATE_SAME_ACCESS is usually what you want here.
-            // If you need specific access rights for NtQueryObject later, you might need to request them.
             if (DuplicateHandle(sourceProcess, (HANDLE)(uintptr_t)h.Handle, GetCurrentProcess(), &dupHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
-                Handle handleObj(dupHandle); // Assuming Handle constructor gets type and name
+                Handle handleObj(dupHandle);
                 
-                // Add a check for whether handleObj.type is actually populated
                 if (handleObj.type.empty()) {
                     std::cerr << "Handle object type is empty for duplicated handle 0x" << std::hex << dupHandle
-                            << " from PID " << h.UniqueProcessId << ", original handle 0x" << h.Handle << std::dec << std::endl;
+                              << " from PID " << h.UniqueProcessId << ", original handle 0x" << h.Handle << std::dec << std::endl;
                     CloseHandle(dupHandle);
                     CloseHandle(sourceProcess);
                     continue;
@@ -320,7 +313,7 @@ namespace WindowsInfo {
                     DWORD fileType = GetFileType(handleObj.handleValue);
                     if (fileType == FILE_TYPE_UNKNOWN && GetLastError() != NO_ERROR) {
                         std::cerr << "GetFileType failed for File handle 0x" << std::hex << handleObj.handleValue
-                                << ": " << GetLastError() << std::dec << std::endl;
+                                  << ": " << GetLastError() << std::dec << std::endl;
                     }
                     switch (fileType) {
                         case FILE_TYPE_CHAR:
@@ -343,18 +336,27 @@ namespace WindowsInfo {
                 } else if (handleObj.type == L"Device") {
                     devices.push_back(handleObj);
                 } else {
-                    // Log unhandled types if necessary
                     // std::cout << "Unhandled handle type: " << std::string(handleObj.type.begin(), handleObj.type.end()) << std::endl;
                 }
 
                 CloseHandle(dupHandle);
             } else {
                 std::cerr << "DuplicateHandle failed for PID " << h.UniqueProcessId << ", original handle 0x" << std::hex << h.Handle
-                        << std::dec << " (Error: " << GetLastError() << ")." << std::endl;
+                          << std::dec << " (Error: " << GetLastError() << ")." << std::endl;
             }
             CloseHandle(sourceProcess);
         }
         std::cout << "Processed " << processedHandles << " handles for PID " << id << std::endl;
+        std::cout << "Successfully categorized handles for PID " << id << ": "
+                  << "Semaphores: " << semaphores.size()
+                  << ", Mutexes: " << mutexes.size()
+                  << ", Disk Files: " << diskFiles.size()
+                  << ", Char Files: " << charFiles.size()
+                  << ", Pipe Files: " << pipeFiles.size()
+                  << ", Unknown Files: " << unknownFiles.size()
+                  << ", Directories: " << directories.size()
+                  << ", Devices: " << devices.size() << std::endl;
+
         CloseHandle(hProcess);
     }
 
@@ -375,6 +377,7 @@ namespace WindowsInfo {
         j["priorityClass"] = priorityClass;
         j["userName"] = userName;
         std::cout << "Carregando informações de memória do processo " << id << std::endl;
+        loadMemoryInfo();
         j["memoryWorkingSet"] = getMemoryWorkingSet();
         j["memoryCommitted"] = getMemoryCommitted();
         j["privateMemoryCommitted"] = getPrivateMemoryCommitted();
@@ -394,7 +397,11 @@ namespace WindowsInfo {
         j["threads"] = std::move(threadsJson);
         // Serializa a lista de handles
         std::cout << "Carregando handles do processo " << id << std::endl;
-        loadHandles();
+        try {
+            loadHandles();
+        } catch (const std::exception& e) {
+            std::cerr << "Erro carregando handles do processo " << id << ": " << e.what() << std::endl;
+        }
         std::cout << "Handles carregados: " << semaphores.size() + mutexes.size() + diskFiles.size() + charFiles.size() + pipeFiles.size() + unknownFiles.size() + directories.size() + devices.size() << std::endl;
         crow::json::wvalue semaphoresJson = crow::json::wvalue::list();
         index = 0;
